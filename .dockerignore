@@ -1,0 +1,12 @@
+node_modules
+.expo
+dist
+web-build
+.git
+.gitignore
+*.md
+.env*.local
+ios
+android
+*.test.ts
+*.test.tsx
