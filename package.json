@@ -12,8 +12,9 @@
     "backend": "bun run src/backend.ts",
     "test": "bun test",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit",
-    "preview": "bun export:web && bun run backend"
+    "tc": "tsc --noEmit",
+    "preview": "bun export:web && bun run backend",
+    "check": "clear && bun run tc && bun run lint && bun run test && echo 'All checks passed ✅'"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

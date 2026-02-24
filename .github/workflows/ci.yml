@@ -21,8 +21,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Generate router types
+        run: bunx expo customize tsconfig.json
+
       - name: Type check
-        run: bun run typecheck
+        run: bun run tc
 
       - name: Lint
         run: bun run lint
