@@ -1,6 +1,5 @@
 import { SqlClient } from "../../sql-client/interface";
-import { Fact } from "../fact";
-import { FactDb } from "./interface";
+import { Entity, Fact, FactsDb, FactsDbQuery, FactsDbResult, FactsDbSubscription } from "./interface";
 
 type FactRow = {
     fact_id: string;
@@ -64,33 +63,54 @@ export const migrations = `
 
 const INSERT_FACT_SQL = `INSERT INTO facts (fact_id, op, entity_id, entity_type, attributes, created_at, recorded_at, parent_id, created_by, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-export class FactDbImplSqlite implements FactDb {
+export class FactDbImplSqlite implements FactsDb {
     constructor(private sqlClient: SqlClient) { }
+    async entities(query: FactsDbQuery): Promise<FactsDbResult<Entity>> {
+        throw new Error("Method not implemented.");
+    }
 
     async migrate(): Promise<void> {
         await this.sqlClient.run(migrations);
     }
 
-    async append(fact: Fact): Promise<void> {
-        await this.sqlClient.run(
-            INSERT_FACT_SQL,
-            [
-                fact.factId,
-                fact.op,
-                fact.entityId,
-                fact.entityType,
-                JSON.stringify(fact.attributes),
-                fact.createdAt,
-                fact.recordedAt,
-                fact.parentId,
-                fact.createdBy,
-                fact.sessionId,
-            ]
-        );
+    async write(facts: Fact[]): Promise<void> {
+        for (const fact of facts) {
+            await this.sqlClient.run(
+                INSERT_FACT_SQL,
+                [
+                    fact.factId,
+                    fact.op,
+                    fact.entityId,
+                    fact.entityType,
+                    JSON.stringify(fact.attributes),
+                    fact.createdAt,
+                    fact.recordedAt,
+                    fact.parentId,
+                    fact.createdBy,
+                    fact.sessionId,
+                ]
+            );
+        }
+    }
+
+    async facts(_query: FactsDbQuery): Promise<FactsDbResult<Fact>> {
+        throw new Error("Not implemented");
     }
 
     async listByEntityId(entityId: string): Promise<Fact[]> {
         const rows = await this.sqlClient.query("SELECT * FROM facts WHERE entity_id = ?", [entityId]);
         return rows.map(toFact);
+    }
+    subscribeFacts(query: FactsDbQuery, callback: (facts: Fact[]) => void): FactsDbSubscription {
+        throw new Error("Method not implemented.");
+    }
+    subscribeEntities(query: FactsDbQuery, callback: (entities: Entity[]) => void): FactsDbSubscription {
+        throw new Error("Method not implemented.");
+    }
+    snapshot(entityId: string, entityType: string): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
+    count(query: FactsDbQuery): Promise<number> {
+        throw new Error("Method not implemented.");
     }
 }
