@@ -9,6 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "export:web": "expo export -p web",
+    "frontend:web:build": "expo export -p web",
     "backend": "bun run src/backend.ts",
     "test": "bun test",
     "lint": "expo lint",
