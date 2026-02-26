@@ -1,5 +1,7 @@
-import { SqlClient } from "../sql-client/interface";
-import { Entity, Patch, PatchesDb, PatchesDbQuery, PatchesDbResult, PatchesDbSubscription } from "./interface";
+import { SqlClient } from "../../sql-client/interface";
+import { Entity, Patch, PatchesDb, PatchesDbQuery, PatchesDbResult, PatchesDbSubscription } from "../interface";
+import insertPatch from "./insert-patch.sql" with { type: "text" };
+import migrations from "./migrations.sql" with { type: "text" };
 
 type PatchRow = {
     patch_id: string;
@@ -10,13 +12,12 @@ type PatchRow = {
     created_at: string;
     recorded_at: string;
     parent_id: string;
-    created_by: string;
-    session_id: string;
+    metadata: string;
 };
 
 const PATCH_ROW_KEYS: (keyof PatchRow)[] = [
     "patch_id", "op", "entity_id", "entity_type", "attributes",
-    "created_at", "recorded_at", "parent_id", "created_by", "session_id",
+    "created_at", "recorded_at", "parent_id", "metadata",
 ];
 
 function isPatchRow(row: unknown): row is PatchRow {
@@ -27,6 +28,7 @@ function isPatchRow(row: unknown): row is PatchRow {
 
 function toPatch(row: unknown): Patch {
     if (!isPatchRow(row)) throw new Error("Invalid patch row");
+    const meta = JSON.parse(row.metadata) as Record<string, unknown>;
     return {
         patchId: row.patch_id,
         op: row.op === "add" ? "add" : "retract",
@@ -36,32 +38,14 @@ function toPatch(row: unknown): Patch {
         createdAt: row.created_at,
         recordedAt: row.recorded_at,
         parentId: row.parent_id,
-        createdBy: row.created_by,
-        sessionId: row.session_id,
+        createdBy: String(meta.createdBy ?? ""),
+        sessionId: meta.sessionId != null ? String(meta.sessionId) : "",
     };
 }
 
-export const migrations = `
-  CREATE TABLE IF NOT EXISTS patches (
-    patch_id TEXT PRIMARY KEY,
-    op TEXT CHECK (op IN ('add', 'retract')) NOT NULL,
-    entity_id TEXT NOT NULL,
-    entity_type TEXT NOT NULL,
-    attributes TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    recorded_at TEXT DEFAULT (datetime('now')) NOT NULL,
-    parent_id TEXT REFERENCES patches(patch_id),
-    created_by TEXT NOT NULL,
-    session_id TEXT,
-    CONSTRAINT unique_entity_patch UNIQUE(entity_id, op, created_at)
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_patches_entity_type_recorded_at ON patches(entity_type, recorded_at);
-  CREATE INDEX IF NOT EXISTS idx_patches_entity_id ON patches(entity_id);
-  CREATE INDEX IF NOT EXISTS idx_patches_created_by ON patches(created_by);
-`;
-
-const INSERT_PATCH_SQL = `INSERT INTO patches (patch_id, op, entity_id, entity_type, attributes, created_at, recorded_at, parent_id, created_by, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+function toMetadata(patch: Patch): string {
+    return JSON.stringify({ createdBy: patch.createdBy, sessionId: patch.sessionId });
+}
 
 export class PatchDbImplSqlite implements PatchesDb {
     constructor(private sqlClient: SqlClient) { }
@@ -76,7 +60,7 @@ export class PatchDbImplSqlite implements PatchesDb {
     async write(patches: Patch[]): Promise<void> {
         for (const patch of patches) {
             await this.sqlClient.run(
-                INSERT_PATCH_SQL,
+                insertPatch,
                 [
                     patch.patchId,
                     patch.op,
@@ -86,8 +70,7 @@ export class PatchDbImplSqlite implements PatchesDb {
                     patch.createdAt,
                     patch.recordedAt,
                     patch.parentId,
-                    patch.createdBy,
-                    patch.sessionId,
+                    toMetadata(patch),
                 ]
             );
         }
