@@ -1,7 +1,7 @@
 export type Op = 'add' | 'retract';
 
-export type Fact = {
-    factId: string;
+export type Patch = {
+    patchId: string;
     op: Op;
     entityId: string;
     entityType: string;
@@ -19,7 +19,7 @@ export type Entity = {
     attributes: Record<string, unknown>;
 }
 
-export type FactsDbQueryWhereClause = {
+export type PatchesDbQueryWhereClause = {
     type: "=";
     attribute: string;
     value: unknown;
@@ -63,35 +63,35 @@ export type FactsDbQueryWhereClause = {
     attribute: string;
 } | {
     type: "or";
-    clauses: FactsDbQueryWhereClause[];
+    clauses: PatchesDbQueryWhereClause[];
 } | {
     type: "and";
-    clauses: FactsDbQueryWhereClause[];
+    clauses: PatchesDbQueryWhereClause[];
 } | {
     type: "not";
-    clause: FactsDbQueryWhereClause;
+    clause: PatchesDbQueryWhereClause;
 }
 
-export type FactsDbQueryOrderBy = {
+export type PatchesDbQueryOrderBy = {
     attribute: string;
     direction: "asc" | "desc";
 }
 
-export type FactsDbQuery = {
+export type PatchesDbQuery = {
     entityType: string;
     entityId?: string | string[];       // single or batch entity lookup
-    where?: FactsDbQueryWhereClause;
-    orderBy?: FactsDbQueryOrderBy[];
+    where?: PatchesDbQueryWhereClause;
+    orderBy?: PatchesDbQueryOrderBy[];
     limit?: number;
     offset?: number;
     after?: string;                     // cursor-based pagination
 }
 
-export type FactsDbSubscription = {
+export type PatchesDbSubscription = {
     unsubscribe: () => void;
 }
 
-export type FactsDbResult<T> = {
+export type PatchesDbResult<T> = {
     data: T[];
     total: number;
     hasMore: boolean;
@@ -99,10 +99,10 @@ export type FactsDbResult<T> = {
 }
 
 
-export interface FactsDb {
+export interface PatchesDb {
     // Writes
-    write(facts: Fact[]): Promise<void>;
+    write(patches: Patch[]): Promise<void>;
     // Reads
-    facts(query: FactsDbQuery): Promise<FactsDbResult<Fact>>;
-    entities(query: FactsDbQuery): Promise<FactsDbResult<Entity>>;
+    patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>>;
+    entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>>;
 }

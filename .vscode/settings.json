@@ -4,5 +4,5 @@
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
   },
-  "cSpell.words": ["fontobject", "healthcheck", "impls", "worklets"]
+  "cSpell.words": ["fontobject", "healthcheck", "impls", "RAILPACK", "worklets"]
 }
