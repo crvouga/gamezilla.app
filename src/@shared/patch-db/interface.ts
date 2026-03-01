@@ -1,16 +1,16 @@
-export type Op = 'add' | 'retract';
-
-export type Patch = {
+export type PatchInput = {
     patchId: string;
-    op: Op;
     entityId: string;
     entityType: string;
     attributes: Record<string, unknown>;
     createdAt: string;
     recordedAt: string;
-    parentId: string;
     createdBy: string;
     sessionId: string;
+}
+
+export type Patch = PatchInput & {
+    parentId: string | null;
 }
 
 export type Entity = {
@@ -79,16 +79,12 @@ export type PatchesDbQueryOrderBy = {
 
 export type PatchesDbQuery = {
     entityType: string;
-    entityId?: string | string[];       // single or batch entity lookup
+    entityId?: string | string[];
     where?: PatchesDbQueryWhereClause;
     orderBy?: PatchesDbQueryOrderBy[];
     limit?: number;
     offset?: number;
-    after?: string;                     // cursor-based pagination
-}
-
-export type PatchesDbSubscription = {
-    unsubscribe: () => void;
+    after?: string;
 }
 
 export type PatchesDbResult<T> = {
@@ -98,11 +94,8 @@ export type PatchesDbResult<T> = {
     nextCursor: string | null;
 }
 
-
 export interface PatchesDb {
-    // Writes
-    write(patches: Patch[]): Promise<void>;
-    // Reads
+    write(patches: PatchInput[]): Promise<void>;
     patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>>;
     entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>>;
 }
