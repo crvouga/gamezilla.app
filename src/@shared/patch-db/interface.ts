@@ -1,13 +1,16 @@
-export type Patch = {
+export type PatchInput = {
     patchId: string;
     entityId: string;
     entityType: string;
     attributes: Record<string, unknown>;
     createdAt: string;
     recordedAt: string;
-    parentId: string;
     createdBy: string;
     sessionId: string;
+}
+
+export type Patch = PatchInput & {
+    parentId: string | null;
 }
 
 export type Entity = {
@@ -92,7 +95,7 @@ export type PatchesDbResult<T> = {
 }
 
 export interface PatchesDb {
-    write(patches: Patch[]): Promise<void>;
+    write(patches: PatchInput[]): Promise<void>;
     patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>>;
     entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>>;
 }

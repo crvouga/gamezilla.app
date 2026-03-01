@@ -2,16 +2,15 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { SqlClientImplBunSqlite } from "../sql-client/impl-bun-sqlite";
 import type { SqlClient } from "../sql-client/interface";
 import { PatchDbImplSqlite } from "./impl-sqlite/impl-sqlite";
-import type { PatchesDb, Patch } from "./interface";
+import type { PatchesDb, PatchInput } from "./interface";
 
 type DbFactory = () => Promise<{ db: PatchesDb; teardown: () => Promise<void> }>;
 
-function makePatch(overrides: Partial<Patch> & Pick<Patch, "patchId" | "entityId" | "entityType">): Patch {
+function makePatch(overrides: Partial<PatchInput> & Pick<PatchInput, "patchId" | "entityId" | "entityType">): PatchInput {
     return {
         attributes: {},
         createdAt: new Date().toISOString(),
         recordedAt: new Date().toISOString(),
-        parentId: "",
         createdBy: "",
         sessionId: "",
         ...overrides,
@@ -44,14 +43,13 @@ describe.each(implementations)("$name", ({ factory }) => {
         await teardown();
     });
 
-    test("write patches, merge into entity, null deletes attribute", async () => {
+    test("write patches, merge into entity, null deletes attribute, parentId is auto-populated", async () => {
         const p1 = makePatch({
             patchId: "p1",
             entityId: "e1",
             entityType: "task",
             attributes: { title: "Buy milk", priority: "low", status: "open" },
             createdAt: "2025-01-01T00:00:00Z",
-            parentId: "",
         });
 
         const p2 = makePatch({
@@ -60,7 +58,6 @@ describe.each(implementations)("$name", ({ factory }) => {
             entityType: "task",
             attributes: { priority: "high", assignee: "alice" },
             createdAt: "2025-01-01T00:01:00Z",
-            parentId: "p1",
         });
 
         const p3 = makePatch({
@@ -69,7 +66,6 @@ describe.each(implementations)("$name", ({ factory }) => {
             entityType: "task",
             attributes: { priority: null },
             createdAt: "2025-01-01T00:02:00Z",
-            parentId: "p2",
         });
 
         await db.write([p1, p2, p3]);
@@ -77,6 +73,10 @@ describe.each(implementations)("$name", ({ factory }) => {
         const patchResult = await db.patches({ entityType: "task", entityId: "e1" });
         expect(patchResult.data).toHaveLength(3);
         expect(patchResult.total).toBe(3);
+
+        expect(patchResult.data[0].parentId).toBeNull();
+        expect(patchResult.data[1].parentId).toBe("p1");
+        expect(patchResult.data[2].parentId).toBe("p2");
 
         const entityResult = await db.entities({ entityType: "task", entityId: "e1" });
         expect(entityResult.data).toHaveLength(1);

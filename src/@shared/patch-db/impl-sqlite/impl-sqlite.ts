@@ -1,5 +1,5 @@
 import { SqlClient } from "../../sql-client/interface";
-import { Entity, Patch, PatchesDb, PatchesDbQuery, PatchesDbQueryWhereClause, PatchesDbResult } from "../interface";
+import { Entity, Patch, PatchInput, PatchesDb, PatchesDbQuery, PatchesDbQueryWhereClause, PatchesDbResult } from "../interface";
 import insertPatch from "./insert-patch.sql" with { type: "text" };
 import migrations from "./migrations.sql" with { type: "text" };
 
@@ -10,7 +10,7 @@ type PatchRow = {
     attributes: string;
     created_at: string;
     recorded_at: string;
-    parent_id: string;
+    parent_id: string | null;
     metadata: string;
 };
 
@@ -29,7 +29,7 @@ function toPatch(row: PatchRow): Patch {
         attributes: JSON.parse(row.attributes),
         createdAt: row.created_at,
         recordedAt: row.recorded_at,
-        parentId: row.parent_id,
+        parentId: row.parent_id ?? null,
         createdBy: String(meta.createdBy ?? ""),
         sessionId: meta.sessionId != null ? String(meta.sessionId) : "",
     };
@@ -43,7 +43,7 @@ function toEntity(row: SnapshotRow): Entity {
     };
 }
 
-function toMetadata(patch: Patch): string {
+function toMetadata(patch: PatchInput): string {
     return JSON.stringify({ createdBy: patch.createdBy, sessionId: patch.sessionId });
 }
 
@@ -190,11 +190,20 @@ export class PatchDbImplSqlite implements PatchesDb {
         }
     }
 
-    async write(patches: Patch[]): Promise<void> {
+    private async resolveParentId(tx: SqlClient, entityId: string, entityType: string): Promise<string | null> {
+        const rows = await tx.query<{ patch_id: string }>(
+            "SELECT patch_id FROM patches WHERE entity_id = ? AND entity_type = ? ORDER BY created_at DESC LIMIT 1",
+            [entityId, entityType]
+        );
+        return rows.length > 0 ? rows[0].patch_id : null;
+    }
+
+    async write(patches: PatchInput[]): Promise<void> {
         if (patches.length === 0) return;
         await this.sqlClient.transaction(async (tx) => {
             const touchedEntities = new Set<string>();
             for (const patch of patches) {
+                const parentId = await this.resolveParentId(tx, patch.entityId, patch.entityType);
                 await tx.run(
                     insertPatch,
                     [
@@ -204,7 +213,7 @@ export class PatchDbImplSqlite implements PatchesDb {
                         JSON.stringify(patch.attributes),
                         patch.createdAt,
                         patch.recordedAt,
-                        patch.parentId,
+                        parentId,
                         toMetadata(patch),
                     ]
                 );
