@@ -78,8 +78,9 @@ A minimal SQL database client abstraction with `connect`, `disconnect`, `query`,
 ### pub-sub
 A synchronous topic-based publish-subscribe module. Provides a `PublishSubscribe` interface with `publish()` and `subscribe()` methods. Generic message types, returns an `Unsubscribe` function.
 
-- **Module:** `src/@shared/pub-sub/pub-sub.ts` — `createPubSub()` factory + `PublishSubscribe` interface
-- **Tests:** `src/@shared/pub-sub/pub-sub.test.ts`
+- **Interface:** `src/@shared/pub-sub/interface.ts` — `PubSub` interface, `Listener`, `Unsubscribe` types
+- **In-memory impl:** `src/@shared/pub-sub/impl-in-memory.ts` — `InMemoryPubSub` class
+- **Tests:** `src/@shared/pub-sub/interface.test.ts`
 
 ### static-file-server
 Static file serving with SPA fallback, path traversal protection, and configurable MIME types.
