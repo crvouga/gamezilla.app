@@ -75,6 +75,12 @@ A minimal SQL database client abstraction with `connect`, `disconnect`, `query`,
 - **Expo SQLite impl:** `src/@shared/sql-client/impl-expo-sqlite.ts`
 - **Tests:** `src/@shared/sql-client/interface.test.ts`
 
+### pub-sub
+A synchronous topic-based publish-subscribe module. Provides a `PublishSubscribe` interface with `publish()` and `subscribe()` methods. Generic message types, returns an `Unsubscribe` function.
+
+- **Module:** `src/@shared/pub-sub/pub-sub.ts` — `createPubSub()` factory + `PublishSubscribe` interface
+- **Tests:** `src/@shared/pub-sub/pub-sub.test.ts`
+
 ### static-file-server
 Static file serving with SPA fallback, path traversal protection, and configurable MIME types.
 
