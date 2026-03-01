@@ -1,4 +1,4 @@
-import { SqlClient } from "../../sql-client/interface";
+ import { SqlClient } from "../../sql-client/interface";
 import { Entity, Patch, PatchesDb, PatchesDbQuery, PatchesDbResult, PatchesDbSubscription } from "../interface";
 import insertPatch from "./insert-patch.sql" with { type: "text" };
 import migrations from "./migrations.sql" with { type: "text" };
