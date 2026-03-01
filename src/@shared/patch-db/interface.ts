@@ -1,8 +1,5 @@
-export type Op = 'add' | 'retract';
-
 export type Patch = {
     patchId: string;
-    op: Op;
     entityId: string;
     entityType: string;
     attributes: Record<string, unknown>;
@@ -79,16 +76,12 @@ export type PatchesDbQueryOrderBy = {
 
 export type PatchesDbQuery = {
     entityType: string;
-    entityId?: string | string[];       // single or batch entity lookup
+    entityId?: string | string[];
     where?: PatchesDbQueryWhereClause;
     orderBy?: PatchesDbQueryOrderBy[];
     limit?: number;
     offset?: number;
-    after?: string;                     // cursor-based pagination
-}
-
-export type PatchesDbSubscription = {
-    unsubscribe: () => void;
+    after?: string;
 }
 
 export type PatchesDbResult<T> = {
@@ -98,11 +91,8 @@ export type PatchesDbResult<T> = {
     nextCursor: string | null;
 }
 
-
 export interface PatchesDb {
-    // Writes
     write(patches: Patch[]): Promise<void>;
-    // Reads
     patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>>;
     entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>>;
 }

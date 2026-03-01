@@ -53,3 +53,29 @@ The `src/backend.ts` Bun server can also serve the static export for self-hosted
 - `npm run backend` — Run Bun static file server (serves `dist/`)
 - `npm run lint` — ESLint
 - `npm run tc` — TypeScript type check
+- `bun test` — Run all tests
+
+## Shared Libraries (`src/@shared/`)
+
+### patch-db
+An entity-as-patches abstraction. Entities are represented as an ordered series of patches. Each patch carries a set of attributes to merge; setting an attribute to `null` deletes it from the entity. Supports branching via `parentId` so multiple concurrent writers can contribute patches.
+
+- **Interface:** `src/@shared/patch-db/interface.ts` — `PatchesDb` interface with `write()`, `patches()`, `entities()` methods
+- **SQLite implementation:** `src/@shared/patch-db/impl-sqlite/impl-sqlite.ts` — backed by the `SqlClient` abstraction
+- **Schema:** `src/@shared/patch-db/impl-sqlite/migrations.sql`
+- **Tests:** `src/@shared/patch-db/interface.test.ts` — tests against the interface, not the implementation
+
+### sql-client
+A minimal SQL database client abstraction with `connect`, `disconnect`, `query`, `run`, and `transaction` methods.
+
+- **Interface:** `src/@shared/sql-client/interface.ts`
+- **Bun SQLite impl:** `src/@shared/sql-client/impl-bun-sqlite.ts`
+- **Expo SQLite impl:** `src/@shared/sql-client/impl-expo-sqlite.ts`
+- **Tests:** `src/@shared/sql-client/interface.test.ts`
+
+### static-file-server
+Static file serving with SPA fallback, path traversal protection, and configurable MIME types.
+
+- **Core:** `src/@shared/static-file-server/static-file-server.ts`
+- **Bun adapter:** `src/@shared/static-file-server/static-file-server-adapter-bun.ts`
+- **Tests:** `src/@shared/static-file-server/static-file-server.test.ts`

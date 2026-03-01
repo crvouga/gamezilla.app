@@ -1,7 +1,6 @@
 INSERT INTO
     patches (
         patch_id,
-        op,
         entity_id,
         entity_type,
         attributes,
@@ -10,4 +9,4 @@ INSERT INTO
         parent_id,
         metadata
     )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
