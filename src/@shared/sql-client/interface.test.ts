@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { InMemoryPubSub } from "../pub-sub/impl-in-memory";
 import { SqlClientImplBunSqlite } from "./impl-bun-sqlite";
-import { PubSubSqlClient } from "./impl-pub-sub";
+import { SqlClientWithPubSub } from "./impl-with-pub-sub";
 import type { SqlClient } from "./interface";
 
 type ClientFactory = () => Promise<SqlClient>;
@@ -16,9 +16,9 @@ async function loadImplementations(): Promise<
                 Promise.resolve(SqlClientImplBunSqlite.open(":memory:")),
         },
         {
-            name: "PubSubSqlClient",
+            name: "SqlClientWithPubSub",
             createClient: () =>
-                Promise.resolve(new PubSubSqlClient(SqlClientImplBunSqlite.open(":memory:"), new InMemoryPubSub())),
+                Promise.resolve(new SqlClientWithPubSub(SqlClientImplBunSqlite.open(":memory:"), new InMemoryPubSub())),
         },
     ];
     try {

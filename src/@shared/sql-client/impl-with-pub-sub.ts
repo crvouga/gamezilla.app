@@ -12,7 +12,7 @@ export type SqlClientEvent =
 
 export const SQL_CLIENT_TOPIC = "sql-client";
 
-export class PubSubSqlClient implements SqlClient {
+export class SqlClientWithPubSub implements SqlClient {
     constructor(
         private client: SqlClient,
         private pubSub: PubSub,
@@ -62,7 +62,7 @@ export class PubSubSqlClient implements SqlClient {
         const start = performance.now();
         try {
             const result = await this.client.transaction(async (tx) => {
-                const wrappedTx = new PubSubSqlClient(tx, this.pubSub, this.topic);
+                const wrappedTx = new SqlClientWithPubSub(tx, this.pubSub, this.topic);
                 return fn(wrappedTx);
             });
             const durationMs = performance.now() - start;

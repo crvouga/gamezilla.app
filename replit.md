@@ -73,7 +73,7 @@ A minimal SQL database client abstraction with `connect`, `disconnect`, `query`,
 - **Interface:** `src/@shared/sql-client/interface.ts`
 - **Bun SQLite impl:** `src/@shared/sql-client/impl-bun-sqlite.ts`
 - **Expo SQLite impl:** `src/@shared/sql-client/impl-expo-sqlite.ts`
-- **PubSub decorator:** `src/@shared/sql-client/impl-pub-sub.ts` — `PubSubSqlClient` wraps any `SqlClient` + `PubSub`, publishes `SqlClientEvent` on connect, disconnect, query, run, transaction begin/commit/rollback
+- **PubSub decorator:** `src/@shared/sql-client/impl-with-pub-sub.ts` — `SqlClientWithPubSub` wraps any `SqlClient` + `PubSub`, publishes `SqlClientEvent` on connect, disconnect, query, run, transaction begin/commit/rollback
 - **Tests:** `src/@shared/sql-client/interface.test.ts`
 
 ### pub-sub
