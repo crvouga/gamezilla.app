@@ -1,33 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { SqlClientImplBunSqlite } from "../sql-client/impl-bun-sqlite";
-import type { SqlClient } from "../sql-client/interface";
-import { PatchDbImplSqlite } from "./impl-sqlite/impl-sqlite";
-import type { PatchesDb, PatchInput } from "./interface";
-
-type DbFactory = () => Promise<{ db: PatchesDb; teardown: () => Promise<void> }>;
-
-function makePatch(overrides: Partial<PatchInput> & Pick<PatchInput, "patchId" | "entityId" | "entityType">): PatchInput {
-    return {
-        attributes: {},
-        createdAt: new Date().toISOString(),
-        recordedAt: new Date().toISOString(),
-        createdBy: "",
-        sessionId: "",
-        ...overrides,
-    };
-}
-
-async function createSqliteFactory(): Promise<{ db: PatchesDb; teardown: () => Promise<void> }> {
-    const client: SqlClient = SqlClientImplBunSqlite.open(":memory:");
-    await client.connect();
-    const db = new PatchDbImplSqlite(client);
-    await db.migrate();
-    return { db, teardown: () => client.disconnect() };
-}
-
-const implementations: { name: string; factory: DbFactory }[] = [
-    { name: "PatchDbImplSqlite", factory: createSqliteFactory },
-];
+import type { PatchesDb } from "../interface";
+import { implementations, whereClauseFixtures } from "./test-helpers";
 
 describe.each(implementations)("$name", ({ factory }) => {
     let db: PatchesDb;
@@ -43,84 +16,9 @@ describe.each(implementations)("$name", ({ factory }) => {
         await teardown();
     });
 
-    test("write patches, merge into entity, null deletes attribute, parentId is auto-populated", async () => {
-        const p1 = makePatch({
-            patchId: "p1",
-            entityId: "e1",
-            entityType: "task",
-            attributes: { title: "Buy milk", priority: "low", status: "open" },
-            createdAt: "2025-01-01T00:00:00Z",
-        });
-
-        const p2 = makePatch({
-            patchId: "p2",
-            entityId: "e1",
-            entityType: "task",
-            attributes: { priority: "high", assignee: "alice" },
-            createdAt: "2025-01-01T00:01:00Z",
-        });
-
-        const p3 = makePatch({
-            patchId: "p3",
-            entityId: "e1",
-            entityType: "task",
-            attributes: { priority: null },
-            createdAt: "2025-01-01T00:02:00Z",
-        });
-
-        await db.write([p1, p2, p3]);
-
-        const patchResult = await db.patches({ entityType: "task", entityId: "e1" });
-        expect(patchResult.data).toHaveLength(3);
-        expect(patchResult.total).toBe(3);
-
-        expect(patchResult.data[0].parentId).toBeNull();
-        expect(patchResult.data[1].parentId).toBe("p1");
-        expect(patchResult.data[2].parentId).toBe("p2");
-
-        const entityResult = await db.entities({ entityType: "task", entityId: "e1" });
-        expect(entityResult.data).toHaveLength(1);
-        const entity = entityResult.data[0];
-        expect(entity.entityId).toBe("e1");
-        expect(entity.entityType).toBe("task");
-        expect(entity.attributes.title).toBe("Buy milk");
-        expect(entity.attributes.assignee).toBe("alice");
-        expect(entity.attributes.status).toBe("open");
-        expect(entity.attributes).not.toHaveProperty("priority");
-    });
-
     describe("where clauses", () => {
         beforeEach(async () => {
-            await db.write([
-                makePatch({
-                    patchId: "w1",
-                    entityId: "t1",
-                    entityType: "item",
-                    attributes: { name: "Alpha Widget", score: 10, tag: "a" },
-                    createdAt: "2025-01-01T00:00:00Z",
-                }),
-                makePatch({
-                    patchId: "w2",
-                    entityId: "t2",
-                    entityType: "item",
-                    attributes: { name: "Beta Gadget", score: 20, tag: "b" },
-                    createdAt: "2025-01-01T00:00:00Z",
-                }),
-                makePatch({
-                    patchId: "w3",
-                    entityId: "t3",
-                    entityType: "item",
-                    attributes: { name: "Gamma Tool", score: 30, tag: "a" },
-                    createdAt: "2025-01-01T00:00:00Z",
-                }),
-                makePatch({
-                    patchId: "w4",
-                    entityId: "t4",
-                    entityType: "item",
-                    attributes: { name: "Delta Device", score: 40 },
-                    createdAt: "2025-01-01T00:00:00Z",
-                }),
-            ]);
+            await db.write(whereClauseFixtures);
         });
 
         test("where = matches exact value", async () => {
