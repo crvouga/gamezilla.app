@@ -14,6 +14,12 @@ type PatchRow = {
     metadata: string;
 };
 
+type SnapshotRow = {
+    entity_id: string;
+    entity_type: string;
+    attributes: string;
+};
+
 function toPatch(row: PatchRow): Patch {
     const meta = JSON.parse(row.metadata) as Record<string, unknown>;
     return {
@@ -29,22 +35,16 @@ function toPatch(row: PatchRow): Patch {
     };
 }
 
-function toMetadata(patch: Patch): string {
-    return JSON.stringify({ createdBy: patch.createdBy, sessionId: patch.sessionId });
+function toEntity(row: SnapshotRow): Entity {
+    return {
+        entityId: row.entity_id,
+        entityType: row.entity_type,
+        attributes: JSON.parse(row.attributes),
+    };
 }
 
-function mergePatches(patches: Patch[]): Record<string, unknown> {
-    const merged: Record<string, unknown> = {};
-    for (const patch of patches) {
-        for (const [key, value] of Object.entries(patch.attributes)) {
-            if (value === null) {
-                delete merged[key];
-            } else {
-                merged[key] = value;
-            }
-        }
-    }
-    return merged;
+function toMetadata(patch: Patch): string {
+    return JSON.stringify({ createdBy: patch.createdBy, sessionId: patch.sessionId });
 }
 
 function sanitizeIdentifier(name: string): string {
@@ -99,6 +99,55 @@ function buildWhereClause(clause: PatchesDbQueryWhereClause): WhereFragment {
     }
 }
 
+function buildSnapshotConditions(query: PatchesDbQuery): { conditions: string[]; params: unknown[] } {
+    const conditions: string[] = ["entity_type = ?"];
+    const params: unknown[] = [query.entityType];
+
+    if (query.entityId != null) {
+        if (Array.isArray(query.entityId)) {
+            const placeholders = query.entityId.map(() => "?").join(", ");
+            conditions.push(`entity_id IN (${placeholders})`);
+            params.push(...query.entityId);
+        } else {
+            conditions.push("entity_id = ?");
+            params.push(query.entityId);
+        }
+    }
+
+    if (query.where) {
+        const fragment = buildWhereClause(query.where);
+        conditions.push(fragment.sql);
+        params.push(...fragment.params);
+    }
+
+    return { conditions, params };
+}
+
+function buildOrderSQL(query: PatchesDbQuery, defaultOrder: string): string {
+    if (query.orderBy && query.orderBy.length > 0) {
+        return "ORDER BY " + query.orderBy.map(o => {
+            const attr = sanitizeIdentifier(o.attribute);
+            const dir = o.direction === "desc" ? "DESC" : "ASC";
+            return `json_extract(attributes, '$.${attr}') ${dir}`;
+        }).join(", ");
+    }
+    return defaultOrder;
+}
+
+function buildLimitSQL(query: PatchesDbQuery): { sql: string; params: unknown[] } {
+    let sql = "";
+    const params: unknown[] = [];
+    if (query.limit != null) {
+        sql += " LIMIT ?";
+        params.push(query.limit);
+    }
+    if (query.offset != null) {
+        sql += " OFFSET ?";
+        params.push(query.offset);
+    }
+    return { sql, params };
+}
+
 export class PatchDbImplSqlite implements PatchesDb {
     constructor(private sqlClient: SqlClient) {}
 
@@ -109,9 +158,42 @@ export class PatchDbImplSqlite implements PatchesDb {
         }
     }
 
+    private async recomputeSnapshot(tx: SqlClient, entityId: string, entityType: string): Promise<void> {
+        const rows = await tx.query<PatchRow>(
+            "SELECT * FROM patches WHERE entity_id = ? AND entity_type = ? ORDER BY created_at ASC",
+            [entityId, entityType]
+        );
+
+        const merged: Record<string, unknown> = {};
+        for (const row of rows) {
+            const attrs = JSON.parse(row.attributes) as Record<string, unknown>;
+            for (const [key, value] of Object.entries(attrs)) {
+                if (value === null) {
+                    delete merged[key];
+                } else {
+                    merged[key] = value;
+                }
+            }
+        }
+
+        if (Object.keys(merged).length === 0) {
+            await tx.run(
+                "DELETE FROM snapshots WHERE entity_id = ? AND entity_type = ?",
+                [entityId, entityType]
+            );
+        } else {
+            await tx.run(
+                `INSERT INTO snapshots (entity_id, entity_type, attributes) VALUES (?, ?, ?)
+                 ON CONFLICT (entity_id, entity_type) DO UPDATE SET attributes = excluded.attributes`,
+                [entityId, entityType, JSON.stringify(merged)]
+            );
+        }
+    }
+
     async write(patches: Patch[]): Promise<void> {
         if (patches.length === 0) return;
         await this.sqlClient.transaction(async (tx) => {
+            const touchedEntities = new Set<string>();
             for (const patch of patches) {
                 await tx.run(
                     insertPatch,
@@ -126,67 +208,72 @@ export class PatchDbImplSqlite implements PatchesDb {
                         toMetadata(patch),
                     ]
                 );
+                touchedEntities.add(`${patch.entityId}\0${patch.entityType}`);
+            }
+
+            for (const key of touchedEntities) {
+                const [entityId, entityType] = key.split("\0");
+                await this.recomputeSnapshot(tx, entityId, entityType);
             }
         });
     }
 
     async patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
-        const conditions: string[] = ["entity_type = ?"];
-        const params: unknown[] = [query.entityType];
+        const { conditions: snapConditions, params: snapParams } = buildSnapshotConditions(query);
+        const snapWhereSQL = snapConditions.join(" AND ");
 
-        if (query.entityId != null) {
-            if (Array.isArray(query.entityId)) {
-                const placeholders = query.entityId.map(() => "?").join(", ");
-                conditions.push(`entity_id IN (${placeholders})`);
-                params.push(...query.entityId);
-            } else {
-                conditions.push("entity_id = ?");
-                params.push(query.entityId);
+        const hasSnapshotFilter = query.where != null;
+
+        let patchConditions: string[];
+        let patchParams: unknown[];
+
+        if (hasSnapshotFilter) {
+            patchConditions = [`p.entity_id IN (SELECT s.entity_id FROM snapshots s WHERE ${snapWhereSQL})`];
+            patchParams = [...snapParams];
+            patchConditions.push("p.entity_type = ?");
+            patchParams.push(query.entityType);
+        } else {
+            patchConditions = ["p.entity_type = ?"];
+            patchParams = [query.entityType];
+            if (query.entityId != null) {
+                if (Array.isArray(query.entityId)) {
+                    const placeholders = query.entityId.map(() => "?").join(", ");
+                    patchConditions.push(`p.entity_id IN (${placeholders})`);
+                    patchParams.push(...query.entityId);
+                } else {
+                    patchConditions.push("p.entity_id = ?");
+                    patchParams.push(query.entityId);
+                }
             }
         }
 
-        if (query.where) {
-            const fragment = buildWhereClause(query.where);
-            conditions.push(fragment.sql);
-            params.push(...fragment.params);
-        }
-
         if (query.after) {
-            conditions.push("recorded_at > ?");
-            params.push(query.after);
+            patchConditions.push("p.recorded_at > ?");
+            patchParams.push(query.after);
         }
 
-        const whereSQL = conditions.join(" AND ");
+        const patchWhereSQL = patchConditions.join(" AND ");
 
         const countRows = await this.sqlClient.query<{ cnt: number }>(
-            `SELECT COUNT(*) as cnt FROM patches WHERE ${whereSQL}`,
-            params
+            `SELECT COUNT(*) as cnt FROM patches p WHERE ${patchWhereSQL}`,
+            patchParams
         );
         const total = countRows[0]?.cnt ?? 0;
 
-        let orderSQL = "ORDER BY created_at ASC";
+        let orderSQL = "ORDER BY p.created_at ASC";
         if (query.orderBy && query.orderBy.length > 0) {
             orderSQL = "ORDER BY " + query.orderBy.map(o => {
                 const attr = sanitizeIdentifier(o.attribute);
                 const dir = o.direction === "desc" ? "DESC" : "ASC";
-                return `json_extract(attributes, '$.${attr}') ${dir}`;
+                return `json_extract(p.attributes, '$.${attr}') ${dir}`;
             }).join(", ");
         }
 
-        let limitSQL = "";
-        const limitParams: unknown[] = [];
-        if (query.limit != null) {
-            limitSQL = " LIMIT ?";
-            limitParams.push(query.limit);
-        }
-        if (query.offset != null) {
-            limitSQL += " OFFSET ?";
-            limitParams.push(query.offset);
-        }
+        const limit = buildLimitSQL(query);
 
         const rows = await this.sqlClient.query<PatchRow>(
-            `SELECT * FROM patches WHERE ${whereSQL} ${orderSQL}${limitSQL}`,
-            [...params, ...limitParams]
+            `SELECT p.* FROM patches p WHERE ${patchWhereSQL} ${orderSQL}${limit.sql}`,
+            [...patchParams, ...limit.params]
         );
 
         const data = rows.map(toPatch);
@@ -197,92 +284,26 @@ export class PatchDbImplSqlite implements PatchesDb {
     }
 
     async entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
-        const conditions: string[] = ["entity_type = ?"];
-        const params: unknown[] = [query.entityType];
-
-        if (query.entityId != null) {
-            if (Array.isArray(query.entityId)) {
-                const placeholders = query.entityId.map(() => "?").join(", ");
-                conditions.push(`entity_id IN (${placeholders})`);
-                params.push(...query.entityId);
-            } else {
-                conditions.push("entity_id = ?");
-                params.push(query.entityId);
-            }
-        }
-
+        const { conditions, params } = buildSnapshotConditions(query);
         const whereSQL = conditions.join(" AND ");
 
-        const entityIdRows = await this.sqlClient.query<{ entity_id: string }>(
-            `SELECT DISTINCT entity_id FROM patches WHERE ${whereSQL} ORDER BY entity_id`,
+        const countRows = await this.sqlClient.query<{ cnt: number }>(
+            `SELECT COUNT(*) as cnt FROM snapshots WHERE ${whereSQL}`,
             params
         );
+        const total = countRows[0]?.cnt ?? 0;
 
-        const allEntities: Entity[] = [];
+        const orderSQL = buildOrderSQL(query, "ORDER BY entity_id ASC");
+        const limit = buildLimitSQL(query);
 
-        for (const { entity_id } of entityIdRows) {
-            const patchRows = await this.sqlClient.query<PatchRow>(
-                `SELECT * FROM patches WHERE entity_id = ? AND entity_type = ? ORDER BY created_at ASC`,
-                [entity_id, query.entityType]
-            );
-            const patches = patchRows.map(toPatch);
-            const attributes = mergePatches(patches);
+        const rows = await this.sqlClient.query<SnapshotRow>(
+            `SELECT * FROM snapshots WHERE ${whereSQL} ${orderSQL}${limit.sql}`,
+            [...params, ...limit.params]
+        );
 
-            if (Object.keys(attributes).length > 0) {
-                allEntities.push({
-                    entityId: entity_id,
-                    entityType: query.entityType,
-                    attributes,
-                });
-            }
-        }
+        const data = rows.map(toEntity);
+        const hasMore = query.limit != null ? (query.offset ?? 0) + data.length < total : false;
 
-        let filtered = allEntities;
-        if (query.where) {
-            filtered = allEntities.filter(entity => matchesWhere(entity.attributes, query.where!));
-        }
-
-        if (query.orderBy && query.orderBy.length > 0) {
-            filtered.sort((a, b) => {
-                for (const o of query.orderBy!) {
-                    const aVal = a.attributes[o.attribute];
-                    const bVal = b.attributes[o.attribute];
-                    if (aVal === bVal) continue;
-                    if (aVal == null) return o.direction === "asc" ? 1 : -1;
-                    if (bVal == null) return o.direction === "asc" ? -1 : 1;
-                    const cmp = aVal < bVal ? -1 : 1;
-                    return o.direction === "asc" ? cmp : -cmp;
-                }
-                return 0;
-            });
-        }
-
-        const total = filtered.length;
-        const offset = query.offset ?? 0;
-        const sliced = query.limit != null
-            ? filtered.slice(offset, offset + query.limit)
-            : filtered.slice(offset);
-        const hasMore = query.limit != null ? offset + sliced.length < total : false;
-
-        return { data: sliced, total, hasMore, nextCursor: null };
-    }
-}
-
-function matchesWhere(attrs: Record<string, unknown>, clause: PatchesDbQueryWhereClause): boolean {
-    switch (clause.type) {
-        case "=": return attrs[clause.attribute] === clause.value;
-        case "!=": return attrs[clause.attribute] !== clause.value;
-        case "gt": return (attrs[clause.attribute] as number) > (clause.value as number);
-        case "gte": return (attrs[clause.attribute] as number) >= (clause.value as number);
-        case "lt": return (attrs[clause.attribute] as number) < (clause.value as number);
-        case "lte": return (attrs[clause.attribute] as number) <= (clause.value as number);
-        case "contains": return String(attrs[clause.attribute] ?? "").includes(clause.value);
-        case "in": return clause.values.includes(attrs[clause.attribute]);
-        case "not_in": return !clause.values.includes(attrs[clause.attribute]);
-        case "exists": return clause.attribute in attrs && attrs[clause.attribute] != null;
-        case "not_exists": return !(clause.attribute in attrs) || attrs[clause.attribute] == null;
-        case "and": return clause.clauses.every(c => matchesWhere(attrs, c));
-        case "or": return clause.clauses.some(c => matchesWhere(attrs, c));
-        case "not": return !matchesWhere(attrs, clause.clause);
+        return { data, total, hasMore, nextCursor: null };
     }
 }

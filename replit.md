@@ -60,9 +60,11 @@ The `src/backend.ts` Bun server can also serve the static export for self-hosted
 ### patch-db
 An entity-as-patches abstraction. Entities are represented as an ordered series of patches. Each patch carries a set of attributes to merge; setting an attribute to `null` deletes it from the entity. Supports branching via `parentId` so multiple concurrent writers can contribute patches.
 
+Uses a **snapshots** table that holds the current merged state of each entity. Snapshots are recomputed on every `write()` within the same transaction. `entities()` queries snapshots directly (all filtering, ordering, pagination at the SQL level). `patches()` uses a subquery against snapshots when `where` filters are present, then returns matching patches.
+
 - **Interface:** `src/@shared/patch-db/interface.ts` — `PatchesDb` interface with `write()`, `patches()`, `entities()` methods
 - **SQLite implementation:** `src/@shared/patch-db/impl-sqlite/impl-sqlite.ts` — backed by the `SqlClient` abstraction
-- **Schema:** `src/@shared/patch-db/impl-sqlite/migrations.sql`
+- **Schema:** `src/@shared/patch-db/impl-sqlite/migrations.sql` — `patches` + `snapshots` tables
 - **Tests:** `src/@shared/patch-db/interface.test.ts` — tests against the interface, not the implementation
 
 ### sql-client
