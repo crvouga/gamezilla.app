@@ -1,6 +1,6 @@
 import type { Listener, PublishSubscribe, Unsubscribe } from "./interface";
 
-export class PublishSubscribeImplInMemory implements PublishSubscribe {
+export class InMemoryPublishSubscribe implements PublishSubscribe {
     private listeners = new Map<string, Set<Listener>>();
 
     publish<T = unknown>(topic: string, message: T): void {
