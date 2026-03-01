@@ -3,7 +3,7 @@ import type { Listener, PublishSubscribe, Unsubscribe } from "./interface";
 export class InMemoryPublishSubscribe implements PublishSubscribe {
     private listeners = new Map<string, Set<Listener>>();
 
-    publish<T = unknown>(topic: string, message: T): void {
+    publish(topic: string, message: unknown): void {
         const set = this.listeners.get(topic);
         if (!set) return;
         for (const listener of set) {
@@ -11,16 +11,15 @@ export class InMemoryPublishSubscribe implements PublishSubscribe {
         }
     }
 
-    subscribe<T = unknown>(topic: string, listener: Listener<T>): Unsubscribe {
+    subscribe(topic: string, listener: Listener): Unsubscribe {
         let set = this.listeners.get(topic);
         if (!set) {
             set = new Set();
             this.listeners.set(topic, set);
         }
-        const wrapped = listener as Listener;
-        set.add(wrapped);
+        set.add(listener);
         return () => {
-            set!.delete(wrapped);
+            set!.delete(listener);
             if (set!.size === 0) {
                 this.listeners.delete(topic);
             }

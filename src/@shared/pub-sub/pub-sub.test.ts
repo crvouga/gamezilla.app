@@ -49,7 +49,7 @@ describe("PublishSubscribe", () => {
     test("supports structured message objects", () => {
         const ps = new InMemoryPublishSubscribe();
         const fn = mock();
-        ps.subscribe<{ id: number; name: string }>("user", fn);
+        ps.subscribe("user", fn);
         ps.publish("user", { id: 1, name: "alice" });
         expect(fn).toHaveBeenCalledWith({ id: 1, name: "alice" });
     });
