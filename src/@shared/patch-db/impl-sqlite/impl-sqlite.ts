@@ -1,5 +1,5 @@
 import { SqlClient } from "../../sql-client/interface";
-import { Entity, Patch, PatchInput, PatchesDb, PatchesDbQuery, PatchesDbResult } from "../interface";
+import { Entity, Patch, PatchInput, PatchesDbQuery, PatchesDbResult, SyncStatePatchesDb } from "../interface";
 import { toEntity, toMetadata, toPatch } from "./mappers";
 import {
     buildLimitSQL,
@@ -11,7 +11,7 @@ import type { PatchRow, SnapshotRow } from "./types";
 const deleteSnapshot = `DELETE FROM snapshots
 WHERE entity_id = ? AND entity_type = ?`;
 
-const insertPatch = `INSERT INTO
+const insertPatch = `INSERT OR IGNORE INTO
     patches (
         patch_id,
         entity_id,
@@ -63,7 +63,11 @@ const upsertSnapshot = `INSERT INTO snapshots (entity_id, entity_type, attribute
 VALUES (?, ?, ?)
 ON CONFLICT (entity_id, entity_type) DO UPDATE SET attributes = excluded.attributes`;
 
-export class PatchDbImplSqlite implements PatchesDb {
+const selectUnsyncedPatches = `SELECT * FROM patches
+WHERE json_extract(metadata, '$.syncedAt') IS NULL
+ORDER BY recorded_at ASC`;
+
+export class PatchDbImplSqlite implements SyncStatePatchesDb {
     constructor(private sqlClient: SqlClient) { }
 
     async migrate(): Promise<void> {
@@ -208,5 +212,20 @@ export class PatchDbImplSqlite implements PatchesDb {
         const hasMore = query.limit != null ? (query.offset ?? 0) + data.length < total : false;
 
         return { data, total, hasMore, nextCursor: null };
+    }
+
+    async getUnsyncedPatches(): Promise<Patch[]> {
+        const rows = await this.sqlClient.query<PatchRow>(selectUnsyncedPatches, []);
+        return rows.map(toPatch);
+    }
+
+    async markPatchesSynced(patchIds: string[]): Promise<void> {
+        if (patchIds.length === 0) return;
+        const now = new Date().toISOString();
+        const placeholders = patchIds.map(() => "?").join(", ");
+        await this.sqlClient.run(
+            `UPDATE patches SET metadata = json_set(metadata, '$.syncedAt', ?) WHERE patch_id IN (${placeholders})`,
+            [now, ...patchIds]
+        );
     }
 }

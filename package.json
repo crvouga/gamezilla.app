@@ -11,6 +11,7 @@
     "export:web": "expo export -p web",
     "frontend:web:build": "expo export -p web",
     "backend": "bun run src/backend.ts",
+    "backend:watch": "bun run src/backend.ts --watch",
     "test": "bun test",
     "test:fast": "SKIP_POSTGRES_TESTS=1 bun test",
     "lint": "expo lint",

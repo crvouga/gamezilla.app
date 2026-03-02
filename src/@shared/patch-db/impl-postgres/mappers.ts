@@ -15,6 +15,7 @@ function toRecordedAt(val: unknown): string {
 
 export function toPatch(row: PatchRow): Patch {
     const meta = parseJson(row.metadata);
+    const { createdBy, sessionId, syncedAt, ...restMeta } = meta;
     return {
         patchId: row.patch_id,
         entityId: row.entity_id,
@@ -23,8 +24,9 @@ export function toPatch(row: PatchRow): Patch {
         createdAt: row.created_at,
         recordedAt: toRecordedAt(row.recorded_at),
         parentId: row.parent_id ?? null,
-        createdBy: String(meta.createdBy ?? ""),
-        sessionId: meta.sessionId != null ? String(meta.sessionId) : "",
+        createdBy: String(createdBy ?? ""),
+        sessionId: sessionId != null ? String(sessionId) : "",
+        meta: Object.keys(restMeta).length > 0 ? restMeta : undefined,
     };
 }
 
@@ -37,5 +39,10 @@ export function toEntity(row: SnapshotRow): Entity {
 }
 
 export function toMetadata(patch: PatchInput): string {
-    return JSON.stringify({ createdBy: patch.createdBy, sessionId: patch.sessionId });
+    return JSON.stringify({
+        createdBy: patch.createdBy,
+        sessionId: patch.sessionId,
+        syncedAt: null,
+        ...(patch.meta ?? {}),
+    });
 }

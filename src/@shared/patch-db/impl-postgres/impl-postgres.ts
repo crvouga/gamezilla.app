@@ -1,5 +1,5 @@
 import { SqlClient } from "../../sql-client/interface";
-import { Entity, Patch, PatchInput, PatchesDb, PatchesDbQuery, PatchesDbResult } from "../interface";
+import { Entity, Patch, PatchInput, PatchesDbQuery, PatchesDbResult, SyncStatePatchesDb } from "../interface";
 import { parseJson, toEntity, toMetadata, toPatch } from "./mappers";
 import {
     buildLimitSQL,
@@ -22,7 +22,8 @@ const insertPatch = `INSERT INTO
         parent_id,
         metadata
     )
-VALUES (?, ?, ?, ?::jsonb, ?, ?::timestamptz, ?, ?::jsonb)`;
+VALUES (?, ?, ?, ?::jsonb, ?, ?::timestamptz, ?, ?::jsonb)
+ON CONFLICT (patch_id) DO NOTHING`;
 
 const migrations = `CREATE TABLE IF NOT EXISTS patches (
     patch_id TEXT PRIMARY KEY,
@@ -63,7 +64,11 @@ const upsertSnapshot = `INSERT INTO snapshots (entity_id, entity_type, attribute
 VALUES (?, ?, ?::jsonb)
 ON CONFLICT (entity_id, entity_type) DO UPDATE SET attributes = excluded.attributes`;
 
-export class PatchDbImplPostgres implements PatchesDb {
+const selectUnsyncedPatches = `SELECT * FROM patches
+WHERE metadata->'syncedAt' IS NULL
+ORDER BY recorded_at ASC`;
+
+export class PatchDbImplPostgres implements SyncStatePatchesDb {
     constructor(private sqlClient: SqlClient) { }
 
     async migrate(): Promise<void> {
@@ -208,5 +213,20 @@ export class PatchDbImplPostgres implements PatchesDb {
         const hasMore = query.limit != null ? (query.offset ?? 0) + data.length < total : false;
 
         return { data, total, hasMore, nextCursor: null };
+    }
+
+    async getUnsyncedPatches(): Promise<Patch[]> {
+        const rows = await this.sqlClient.query<PatchRow>(selectUnsyncedPatches, []);
+        return rows.map(toPatch);
+    }
+
+    async markPatchesSynced(patchIds: string[]): Promise<void> {
+        if (patchIds.length === 0) return;
+        const now = new Date().toISOString();
+        const placeholders = patchIds.map(() => "?").join(", ");
+        await this.sqlClient.run(
+            `UPDATE patches SET metadata = jsonb_set(metadata, '{syncedAt}', to_jsonb(?::text)) WHERE patch_id IN (${placeholders})`,
+            [now, ...patchIds]
+        );
     }
 }

@@ -4,7 +4,15 @@ import { Entity, Patch, PatchesDb, PatchesDbQuery, PatchesDbResult, PatchInput }
 
 const PATCHES_DB_TOPIC = "patches-db";
 
-export const SubscribablePatchesDbToken: InjectionToken<SubscribablePatchesDb> = Symbol("SubscribablePatchesDb");
+/** Any PatchesDb that exposes subscribe.entities and subscribe.patches (e.g. SubscribablePatchesDb, SyncPatchesDb) */
+export type SubscribablePatchesDbLike = PatchesDb & {
+    subscribe: {
+        patches: (query: PatchesDbQuery, listener: (result: PatchesDbResult<Patch>) => void) => Unsubscribe;
+        entities: (query: PatchesDbQuery, listener: (result: PatchesDbResult<Entity>) => void) => Unsubscribe;
+    };
+};
+
+export const SubscribablePatchesDbToken: InjectionToken<SubscribablePatchesDbLike> = Symbol("SubscribablePatchesDb");
 
 export class SubscribablePatchesDb implements PatchesDb {
     constructor(private db: PatchesDb, private pubSub: PubSub) { }

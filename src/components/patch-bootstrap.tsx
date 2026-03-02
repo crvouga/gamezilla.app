@@ -1,6 +1,6 @@
 import type { Container } from "@/@shared/dependency-injection/dependency-injection-container";
 import { ContainerProvider } from "@/@shared/dependency-injection/react";
-import { bootstrapPatchDbExpo } from "@/@shared/patch-db/bootstrap-expo";
+import { bootstrapPatchDbExpoSync } from "@/@shared/patch-db/bootstrap-expo";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useEffect, useState, type ReactNode } from "react";
@@ -11,7 +11,7 @@ export function PatchBootstrap({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         let cancelled = false;
-        bootstrapPatchDbExpo()
+        bootstrapPatchDbExpoSync()
             .then(({ container: c }) => {
                 if (!cancelled) setContainer(c);
             })

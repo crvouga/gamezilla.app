@@ -7,6 +7,8 @@ export type PatchInput = {
     recordedAt: string;
     createdBy: string;
     sessionId: string;
+    /** Dynamic metadata (e.g. syncedAt) stored in metadata column */
+    meta?: Record<string, unknown>;
 }
 
 export type Patch = PatchInput & {
@@ -98,4 +100,9 @@ export interface PatchesDb {
     write(patches: PatchInput[]): Promise<void>;
     patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>>;
     entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>>;
+}
+
+export interface SyncStatePatchesDb extends PatchesDb {
+    getUnsyncedPatches(): Promise<Patch[]>;
+    markPatchesSynced(patchIds: string[]): Promise<void>;
 }
