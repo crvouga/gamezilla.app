@@ -4,5 +4,14 @@
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
   },
-  "cSpell.words": ["fontobject", "healthcheck", "impls", "RAILPACK", "worklets"]
+  "cSpell.words": [
+    "fontobject",
+    "gamezilla",
+    "healthcheck",
+    "impls",
+    "RAILPACK",
+    "schemaname",
+    "tablename",
+    "worklets"
+  ]
 }
