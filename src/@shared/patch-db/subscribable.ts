@@ -22,8 +22,8 @@ export class SubscribablePatchesDb implements PatchesDb {
         this.pubSub.publish(PATCHES_DB_TOPIC, { type: "invalidated" });
     }
 
-    patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
-        return this.db.patches(query);
+    read(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
+        return this.db.read(query);
     }
 
     entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
@@ -33,7 +33,7 @@ export class SubscribablePatchesDb implements PatchesDb {
     subscribe = {
         patches: (query: PatchesDbQuery, listener: (result: PatchesDbResult<Patch>) => void): Unsubscribe => {
             const notify = async () => {
-                const result = await this.db.patches(query);
+                const result = await this.db.read(query);
                 listener(result);
             };
             void notify();

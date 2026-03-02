@@ -6,6 +6,7 @@ import type {
     PatchesDbResult,
     PatchInput,
 } from "../interface";
+import { ENTITIES_QUERY, PATCHES_QUERY, PATCHES_QUERY_BATCH, PATCHES_WRITE } from "./shared";
 
 export class PatchDbImplHttp implements PatchesDb {
     constructor(private baseUrl: string) { }
@@ -24,20 +25,20 @@ export class PatchDbImplHttp implements PatchesDb {
         return res.json() as Promise<T>;
     }
 
-    async patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
-        return this.post<PatchesDbResult<Patch>>("/api/patches/query", { query });
+    async read(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
+        return this.post<PatchesDbResult<Patch>>(PATCHES_QUERY, { query });
     }
 
     async patchesBatch(queries: PatchesDbQuery[]): Promise<PatchesDbResult<Patch>[]> {
         if (queries.length === 0) return [];
-        return this.post<PatchesDbResult<Patch>[]>("/api/patches/query-batch", { queries });
+        return this.post<PatchesDbResult<Patch>[]>(PATCHES_QUERY_BATCH, { queries });
     }
 
     async entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
-        return this.post<PatchesDbResult<Entity>>("/api/entities/query", { query });
+        return this.post<PatchesDbResult<Entity>>(ENTITIES_QUERY, { query });
     }
 
     async write(patches: PatchInput[]): Promise<void> {
-        await this.post("/api/patches/write", { patches });
+        await this.post(PATCHES_WRITE, { patches });
     }
 }

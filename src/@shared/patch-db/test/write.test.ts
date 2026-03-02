@@ -47,7 +47,7 @@ describe.each(implementations)("$name", ({ name, factory }) => {
 
         await db.write([p1, p2, p3]);
 
-        const patchResult = await db.patches({ entityType: "task", entityId: "e1" });
+        const patchResult = await db.read({ entityType: "task", entityId: "e1" });
         expect(patchResult.data).toHaveLength(3);
         expect(patchResult.total).toBe(3);
 

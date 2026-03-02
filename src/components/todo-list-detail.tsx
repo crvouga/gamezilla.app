@@ -6,6 +6,7 @@ import { ThemedView } from "@/components/themed-view";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
     KeyboardAvoidingView,
@@ -14,6 +15,8 @@ import {
     StyleSheet,
     TextInput,
 } from "react-native";
+
+const INBOX_LIST_ID = "__inbox__";
 
 const DELETED_CLAUSE = {
     type: "or" as const,
@@ -31,16 +34,36 @@ const ACTIVE_CLAUSE = {
     ],
 };
 
-function buildTodoQuery(filter: Filter) {
+function buildTodoQuery(listId: string, filter: Filter) {
+    const listClause =
+        listId === INBOX_LIST_ID
+            ? {
+                  type: "or" as const,
+                  clauses: [
+                      { type: "not_exists" as const, attribute: "listId" },
+                      { type: "=" as const, attribute: "listId", value: null },
+                      { type: "=" as const, attribute: "listId", value: "" },
+                  ],
+              }
+            : { type: "=" as const, attribute: "listId", value: listId };
+
     const where =
         filter === "all"
-            ? DELETED_CLAUSE
+            ? { type: "and" as const, clauses: [DELETED_CLAUSE, listClause] }
             : filter === "active"
-              ? { type: "and" as const, clauses: [DELETED_CLAUSE, ACTIVE_CLAUSE] }
+              ? {
+                    type: "and" as const,
+                    clauses: [DELETED_CLAUSE, listClause, ACTIVE_CLAUSE],
+                }
               : {
                     type: "and" as const,
-                    clauses: [DELETED_CLAUSE, { type: "=" as const, attribute: "completed", value: true }],
+                    clauses: [
+                        DELETED_CLAUSE,
+                        listClause,
+                        { type: "=" as const, attribute: "completed", value: true },
+                    ],
                 };
+
     return {
         entityType: "todo" as const,
         where,
@@ -51,7 +74,9 @@ function buildTodoQuery(filter: Filter) {
     };
 }
 
-type TodoEntity = Entity & { attributes: { title?: string; completed?: boolean; order?: number } };
+type TodoEntity = Entity & {
+    attributes: { title?: string; completed?: boolean; order?: number; listId?: string };
+};
 
 function TodoItem({
     entityId,
@@ -90,17 +115,30 @@ function TodoItem({
 
 type Filter = "all" | "active" | "completed";
 
-export function TodoList() {
+export function TodoListDetail() {
+    const { listId } = useLocalSearchParams<{ listId: string }>();
+    const router = useRouter();
     const db = usePatchesDb();
     const [input, setInput] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
-    const allResult = useEntities(buildTodoQuery("all"));
-    const filterResult = useEntities(buildTodoQuery(filter));
+
+    const lid = listId ?? INBOX_LIST_ID;
+
+    const allResult = useEntities(buildTodoQuery(lid, "all"));
+    const filterResult = useEntities(buildTodoQuery(lid, filter));
     const todos = filterResult.data as TodoEntity[];
     const totalCount = allResult.total;
+
+    const listEntity = useEntity({
+        entityType: "todoList",
+        entityId: lid === INBOX_LIST_ID ? "__inbox_placeholder__" : lid,
+    });
+    const listName =
+        lid === INBOX_LIST_ID ? "Inbox" : (listEntity?.attributes.name as string) ?? "List";
+
     const filterActiveBg = useThemeColor({
         light: "rgba(10, 126, 164, 0.2)",
-        dark: "rgba(255, 255, 255, 0.15)"
+        dark: "rgba(255, 255, 255, 0.15)",
     }, "tint");
     const inputBg = useThemeColor({}, "background");
     const inputColor = useThemeColor({}, "text");
@@ -121,6 +159,7 @@ export function TodoList() {
                     completed: false,
                     order: totalCount,
                     createdAt: new Date().toISOString(),
+                    ...(lid !== INBOX_LIST_ID && { listId: lid }),
                 },
             }),
         ]);
@@ -156,7 +195,10 @@ export function TodoList() {
             style={styles.container}
         >
             <ThemedView style={styles.header}>
-                <ThemedText type="title">Todos</ThemedText>
+                <Pressable onPress={() => router.back()} style={styles.backButton}>
+                    <ThemedText style={styles.backText}>← Back</ThemedText>
+                </Pressable>
+                <ThemedText type="title">{listName}</ThemedText>
                 <ThemedText type="subtitle">Powered by patch-db</ThemedText>
             </ThemedView>
             <ThemedView style={styles.filterRow}>
@@ -227,6 +269,13 @@ const styles = StyleSheet.create({
     header: {
         marginBottom: 16,
     },
+    backButton: {
+        marginBottom: 8,
+    },
+    backText: {
+        fontSize: 16,
+        opacity: 0.8,
+    },
     filterRow: {
         flexDirection: "row",
         gap: 8,
@@ -274,10 +323,6 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
-    },
-    checkbox: {
-        width: 28,
-        alignItems: "center",
     },
     checkboxText: {
         fontSize: 20,

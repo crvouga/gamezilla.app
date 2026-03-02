@@ -133,7 +133,7 @@ export class PatchDbImplSqlite implements SyncStatePatchesDb {
         });
     }
 
-    async patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
+    async read(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
         const { conditions: snapConditions, params: snapParams } = buildSnapshotConditions(query);
         const snapWhereSQL = snapConditions.join(" AND ");
 

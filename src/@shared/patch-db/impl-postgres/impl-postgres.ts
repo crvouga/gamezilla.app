@@ -134,7 +134,7 @@ export class PatchDbImplPostgres implements SyncStatePatchesDb {
         });
     }
 
-    async patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
+    async read(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
         const hasSnapshotFilter = query.where != null;
         const { conditions: snapConditions, params: snapParams } = hasSnapshotFilter
             ? buildSnapshotConditions(query, "s.")

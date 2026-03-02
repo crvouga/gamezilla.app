@@ -22,7 +22,7 @@ export async function bootstrapPatchDbExpoSync(
     options: BootstrapPatchDbExpoSyncOptions = {}
 ): Promise<BootstrapResult> {
     const {
-        databaseName = "todos",
+        databaseName = "main",
         apiUrl = "http://localhost:5001",
         pollIntervalMs = 1000,
         pushIntervalMs = 2000,

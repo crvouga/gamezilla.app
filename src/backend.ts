@@ -4,7 +4,7 @@ import { SqlClientImplBunSqlite } from "@/@shared/sql-client/impl-bun-sqlite";
 
 const PORT = process.env.PORT ?? 5001;
 
-const sqlClient = SqlClientImplBunSqlite.open("./patch-db.sqlite");
+const sqlClient = SqlClientImplBunSqlite.open(":memory:");
 await sqlClient.connect();
 
 const patchDb = new PatchDbImplSqlite(sqlClient);
