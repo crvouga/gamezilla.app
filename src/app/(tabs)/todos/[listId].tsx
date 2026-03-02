@@ -1,4 +1,4 @@
-import { TodoListDetail } from "@/components/todo-list-detail";
+import { TodoListDetail } from "@/features/todo-list/todo-list-detail";
 
 export default function TodoListDetailScreen() {
     return <TodoListDetail />;
