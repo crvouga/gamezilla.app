@@ -1,19 +1,13 @@
 import type { PatchesDb, PatchesDbQuery } from "../interface";
-import { ENTITIES_QUERY, PATCHES_QUERY, PATCHES_QUERY_BATCH, PATCHES_WRITE } from "./shared";
+import { ENTITIES_QUERY, PATCHES_QUERY, PATCHES_WRITE } from "./shared";
 
 export function createPatchDbHttpHandlers(db: PatchesDb): (req: Request) => Promise<Response> {
     return async (req: Request): Promise<Response> => {
         const url = new URL(req.url);
 
         if (url.pathname === PATCHES_QUERY && req.method === "POST") {
-            const body = (await req.json()) as { query: PatchesDbQuery };
-            const result = await db.patches(body.query);
-            return Response.json(result);
-        }
-
-        if (url.pathname === PATCHES_QUERY_BATCH && req.method === "POST") {
             const body = (await req.json()) as { queries: PatchesDbQuery[] };
-            const results = await Promise.all(body.queries.map((q) => db.patches(q)));
+            const results = await db.patches(body.queries);
             return Response.json(results);
         }
 

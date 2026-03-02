@@ -6,7 +6,7 @@ import type {
     PatchesDbResult,
     PatchInput,
 } from "../interface";
-import { ENTITIES_QUERY, PATCHES_QUERY, PATCHES_QUERY_BATCH, PATCHES_WRITE } from "./shared";
+import { ENTITIES_QUERY, PATCHES_QUERY, PATCHES_WRITE } from "./shared";
 
 export class PatchDbImplHttp implements PatchesDb {
     constructor(private baseUrl: string) { }
@@ -25,13 +25,9 @@ export class PatchDbImplHttp implements PatchesDb {
         return res.json() as Promise<T>;
     }
 
-    async patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
-        return this.post<PatchesDbResult<Patch>>(PATCHES_QUERY, { query });
-    }
-
-    async patchesBatch(queries: PatchesDbQuery[]): Promise<PatchesDbResult<Patch>[]> {
+    async patches(queries: PatchesDbQuery[]): Promise<PatchesDbResult<Patch>[]> {
         if (queries.length === 0) return [];
-        return this.post<PatchesDbResult<Patch>[]>(PATCHES_QUERY_BATCH, { queries });
+        return this.post<PatchesDbResult<Patch>[]>(PATCHES_QUERY, { queries });
     }
 
     async entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {

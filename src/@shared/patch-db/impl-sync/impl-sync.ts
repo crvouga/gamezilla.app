@@ -63,8 +63,8 @@ export class SyncPatchesDb implements PatchesDb {
         return result;
     }
 
-    patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
-        return this.local.patches(query);
+    patches(queries: PatchesDbQuery[]): Promise<PatchesDbResult<Patch>[]> {
+        return this.local.patches(queries);
     }
 
     entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
@@ -90,9 +90,9 @@ export class SyncPatchesDb implements PatchesDb {
         }
 
         const notify = async () => {
-            const result =
-                mode === "patches"
-                    ? ((await this.local.patches(query)) as PatchesDbResult<T>)
+                const result =
+                    mode === "patches"
+                        ? ((await this.local.patches([query]))[0] as PatchesDbResult<T>)
                     : ((await this.local.entities(query)) as PatchesDbResult<T>);
             listener(result);
         };
@@ -157,7 +157,7 @@ export class SyncPatchesDb implements PatchesDb {
         try {
             const syncQueries: PatchesDbQuery[] = [];
             for (const { query } of entries) {
-                const localResult = await this.local.patches(query);
+                const [localResult] = await this.local.patches([query]);
                 const lastRecordedAt = getLastRecordedAt(localResult.data);
                 syncQueries.push({
                     ...query,
@@ -165,10 +165,7 @@ export class SyncPatchesDb implements PatchesDb {
                 });
             }
 
-            const remote = this.remote as PatchesDb & { patchesBatch?: (queries: PatchesDbQuery[]) => Promise<PatchesDbResult<Patch>[]> };
-            const results = remote.patchesBatch
-                ? await remote.patchesBatch(syncQueries)
-                : await Promise.all(syncQueries.map((q) => this.remote.patches(q)));
+            const results = await this.remote.patches(syncQueries);
 
             let hasNewPatches = false;
             for (const remoteResult of results) {
