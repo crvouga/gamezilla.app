@@ -1,6 +1,6 @@
 import type { Entity } from "@/@shared/patch-db/interface";
 import { makePatchInput } from "@/@shared/patch-db/make-patch";
-import { useEntities, usePatchesDb } from "@/@shared/patch-db/react";
+import { useEntities, useEntity, usePatchesDb } from "@/@shared/patch-db/react";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Colors } from "@/constants/theme";
@@ -33,18 +33,19 @@ const TODO_QUERY = {
 type TodoEntity = Entity & { attributes: { title?: string; completed?: boolean; order?: number } };
 
 function TodoItem({
-    entity,
+    entityId,
     onToggle,
     onDelete,
 }: {
-    entity: TodoEntity;
+    entityId: string;
     onToggle: () => void;
     onDelete: () => void;
 }) {
     const colorScheme = useColorScheme();
     const tint = Colors[colorScheme ?? "light"].tint;
-    const completed = entity.attributes.completed === true;
-    const title = (entity.attributes.title as string) ?? "";
+    const entity = useEntity({ entityId, entityType: "todo" });
+    const completed = entity?.attributes.completed === true;
+    const title = (entity?.attributes.title as string) ?? "";
 
     return (
         <ThemedView style={styles.todoRow}>
@@ -149,7 +150,7 @@ export function TodoList() {
                     todos.map((entity) => (
                         <TodoItem
                             key={entity.entityId}
-                            entity={entity}
+                            entityId={entity.entityId}
                             onToggle={() => toggleTodo(entity)}
                             onDelete={() => deleteTodo(entity)}
                         />

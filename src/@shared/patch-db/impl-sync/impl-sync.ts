@@ -150,28 +150,41 @@ export class SyncPatchesDb implements PatchesDb {
     }
 
     private async poll(): Promise<void> {
-        for (const { query } of this.activeQueries.values()) {
-            try {
+        const entries = Array.from(this.activeQueries.values());
+        if (entries.length === 0) return;
+
+        try {
+            const syncQueries: PatchesDbQuery[] = [];
+            for (const { query } of entries) {
                 const localResult = await this.local.patches(query);
                 const lastRecordedAt = getLastRecordedAt(localResult.data);
-
-                const syncQuery: PatchesDbQuery = {
+                syncQueries.push({
                     ...query,
                     after: lastRecordedAt ?? undefined,
-                };
+                });
+            }
 
-                const remoteResult = await this.remote.patches(syncQuery);
+            const remote = this.remote as PatchesDb & { patchesBatch?: (queries: PatchesDbQuery[]) => Promise<PatchesDbResult<Patch>[]> };
+            const results = remote.patchesBatch
+                ? await remote.patchesBatch(syncQueries)
+                : await Promise.all(syncQueries.map((q) => this.remote.patches(q)));
+
+            let hasNewPatches = false;
+            for (const remoteResult of results) {
                 if (remoteResult.data.length > 0) {
                     const withSynced = remoteResult.data.map((p) => ({
                         ...p,
                         meta: { ...p.meta, syncedAt: new Date().toISOString() },
                     }));
                     await this.local.write(withSynced);
-                    this.pubSub.publish(PATCHES_DB_TOPIC, { type: "invalidated" });
+                    hasNewPatches = true;
                 }
-            } catch (err) {
-                console.warn("[SyncPatchesDb] poll failed:", err);
             }
+            if (hasNewPatches) {
+                this.pubSub.publish(PATCHES_DB_TOPIC, { type: "invalidated" });
+            }
+        } catch (err) {
+            console.warn("[SyncPatchesDb] poll failed:", err);
         }
     }
 }

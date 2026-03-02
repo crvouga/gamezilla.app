@@ -8,7 +8,7 @@ import type {
 } from "../interface";
 
 export class PatchDbImplHttp implements PatchesDb {
-    constructor(private baseUrl: string) {}
+    constructor(private baseUrl: string) { }
 
     private async post<T>(path: string, body: unknown): Promise<T> {
         const url = `${this.baseUrl.replace(/\/$/, "")}${path}`;
@@ -26,6 +26,11 @@ export class PatchDbImplHttp implements PatchesDb {
 
     async patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
         return this.post<PatchesDbResult<Patch>>("/api/patches/query", { query });
+    }
+
+    async patchesBatch(queries: PatchesDbQuery[]): Promise<PatchesDbResult<Patch>[]> {
+        if (queries.length === 0) return [];
+        return this.post<PatchesDbResult<Patch>[]>("/api/patches/query-batch", { queries });
     }
 
     async entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {

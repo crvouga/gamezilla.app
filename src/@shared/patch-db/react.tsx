@@ -32,3 +32,8 @@ export function useEntities(query: PatchesDbQuery): PatchesDbResult<Entity> {
     }, [db, queryKey]);
     return result;
 }
+
+export function useEntity(query: PatchesDbQuery): Entity | null {
+    const entities = useEntities(query);
+    return entities.data.length > 0 ? entities.data[0] : null;
+}
