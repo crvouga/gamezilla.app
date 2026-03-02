@@ -6,16 +6,65 @@ import {
     buildOrderSQL,
     buildSnapshotConditions,
 } from "./query-builder";
-import deleteSnapshot from "./sql/delete-snapshot.sql" with { type: "text" };
-import insertPatch from "./sql/insert-patch.sql" with { type: "text" };
-import migrations from "./sql/migrations.sql" with { type: "text" };
-import resolveParentIdSql from "./sql/resolve-parent-id.sql" with { type: "text" };
-import selectPatchesForSnapshot from "./sql/select-patches-for-snapshot.sql" with { type: "text" };
-import upsertSnapshot from "./sql/upsert-snapshot.sql" with { type: "text" };
 import type { PatchRow, SnapshotRow } from "./types";
 
+const deleteSnapshot = `DELETE FROM snapshots
+WHERE entity_id = ? AND entity_type = ?`;
+
+const insertPatch = `INSERT INTO
+    patches (
+        patch_id,
+        entity_id,
+        entity_type,
+        attributes,
+        created_at,
+        recorded_at,
+        parent_id,
+        metadata
+    )
+VALUES (?, ?, ?, ?::jsonb, ?, ?::timestamptz, ?, ?::jsonb)`;
+
+const migrations = `CREATE TABLE IF NOT EXISTS patches (
+    patch_id TEXT PRIMARY KEY,
+    entity_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    attributes JSONB NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    recorded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    parent_id TEXT REFERENCES patches (patch_id),
+    metadata JSONB NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_patches_entity_type_recorded_at ON patches (entity_type, recorded_at);
+
+CREATE INDEX IF NOT EXISTS idx_patches_entity_id ON patches (entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_patches_parent_id ON patches (parent_id);
+
+CREATE TABLE IF NOT EXISTS snapshots (
+    entity_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    attributes JSONB NOT NULL DEFAULT '{}',
+    PRIMARY KEY (entity_id, entity_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_entity_type ON snapshots (entity_type);`;
+
+const resolveParentIdSql = `SELECT patch_id FROM patches
+WHERE entity_id = ? AND entity_type = ?
+ORDER BY created_at DESC
+LIMIT 1`;
+
+const selectPatchesForSnapshot = `SELECT * FROM patches
+WHERE entity_id = ? AND entity_type = ?
+ORDER BY created_at ASC`;
+
+const upsertSnapshot = `INSERT INTO snapshots (entity_id, entity_type, attributes)
+VALUES (?, ?, ?::jsonb)
+ON CONFLICT (entity_id, entity_type) DO UPDATE SET attributes = excluded.attributes`;
+
 export class PatchDbImplPostgres implements PatchesDb {
-    constructor(private sqlClient: SqlClient) {}
+    constructor(private sqlClient: SqlClient) { }
 
     async migrate(): Promise<void> {
         const statements = migrations.split(";").map(s => s.trim()).filter(Boolean);

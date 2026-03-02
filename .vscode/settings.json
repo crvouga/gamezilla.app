@@ -6,15 +6,18 @@
   },
   "cSpell.words": [
     "bunx",
+    "credentialless",
     "fontobject",
     "gamezilla",
     "healthcheck",
     "impls",
     "pglite",
+    "Pressable",
     "RAILPACK",
     "schemaname",
     "sslmode",
     "tablename",
+    "TIMESTAMPTZ",
     "worklets"
   ]
 }
