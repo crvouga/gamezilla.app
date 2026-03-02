@@ -81,10 +81,11 @@ export class PatchDbImplPostgres implements PatchesDb {
     }
 
     async patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
-        const { conditions: snapConditions, params: snapParams } = buildSnapshotConditions(query);
-        const snapWhereSQL = snapConditions.join(" AND ");
-
         const hasSnapshotFilter = query.where != null;
+        const { conditions: snapConditions, params: snapParams } = hasSnapshotFilter
+            ? buildSnapshotConditions(query, "s.")
+            : { conditions: [] as string[], params: [] as unknown[] };
+        const snapWhereSQL = snapConditions.join(" AND ");
 
         let patchConditions: string[];
         let patchParams: unknown[];
@@ -140,11 +141,6 @@ export class PatchDbImplPostgres implements PatchesDb {
     async entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
         const { conditions, params } = buildSnapshotConditions(query);
         const whereSQL = conditions.join(" AND ");
-        if (typeof process !== "undefined" && process.env.DEBUG_PATCH_DB === "1") {
-            // eslint-disable-next-line no-console
-            console.log("[PatchDb] entities", { whereSQL, params });
-        }
-
         const countRows = await this.sqlClient.query<{ cnt: number }>(
             `SELECT COUNT(*) as cnt FROM snapshots WHERE ${whereSQL}`,
             params

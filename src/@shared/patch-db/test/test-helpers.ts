@@ -8,14 +8,25 @@ import type { PatchesDb, PatchInput } from "../interface";
 
 export type DbFactory = () => Promise<{ db: PatchesDb; teardown: () => Promise<void> }>;
 
-let cachedPostgresClient: SqlClient | null = null;
+let cachedPostgresClient: InstanceType<typeof SqlClientImplBunPostgres> | null = null;
+
+/** Truncate patch-db tables on our connection. Avoids DROP SCHEMA which invalidates other connections. */
+async function truncatePatchDbTables(client: InstanceType<typeof SqlClientImplBunPostgres>): Promise<void> {
+    await client.run("TRUNCATE snapshots, patches CASCADE");
+}
+
+let savedDatabaseUrl: string | undefined;
 
 export async function createPostgresFactory(): Promise<{ db: PatchesDb; teardown: () => Promise<void> }> {
-    const pg = await getPGliteTestInstance(25434);
-    await pg.wipe();
+    const pg = await getPGliteTestInstance(25433);
+    savedDatabaseUrl = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = pg.connectionUrl;
     if (!cachedPostgresClient) {
+        await pg.wipe();
         cachedPostgresClient = SqlClientImplBunPostgres.connect(pg.connectionUrl);
         await cachedPostgresClient.connect();
+    } else {
+        await truncatePatchDbTables(cachedPostgresClient);
     }
     const db = new PatchDbImplPostgres(cachedPostgresClient);
     await db.migrate();
@@ -23,6 +34,11 @@ export async function createPostgresFactory(): Promise<{ db: PatchesDb; teardown
 }
 
 export async function teardownPostgresTests(): Promise<void> {
+    if (savedDatabaseUrl !== undefined) {
+        process.env.DATABASE_URL = savedDatabaseUrl;
+    } else {
+        delete process.env.DATABASE_URL;
+    }
     if (cachedPostgresClient) {
         await cachedPostgresClient.disconnect();
         cachedPostgresClient = null;

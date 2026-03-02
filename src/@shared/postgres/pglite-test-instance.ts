@@ -45,6 +45,7 @@ export async function getPGliteTestInstance(
     port = 25433
 ): Promise<PGliteTestInstance> {
     if (!server) {
+        connectionUrl = `postgres://postgres:postgres@127.0.0.1:${port}/postgres?sslmode=disable`;
         db = await PGlite.create();
         server = new PGLiteSocketServer({
             db,
@@ -52,7 +53,6 @@ export async function getPGliteTestInstance(
             host: "127.0.0.1",
         });
         await server.start();
-        connectionUrl = `postgres://postgres:postgres@127.0.0.1:${port}/postgres?sslmode=disable`;
     }
 
     return {

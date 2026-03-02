@@ -9,95 +9,102 @@ export function sanitizeIdentifier(name: string): string {
     return name;
 }
 
-/** Use literal key (sanitized) for JSONB access - avoids parameter binding issues with dynamic keys */
-function jsonAttrLiteral(attr: string): string {
-    const safe = sanitizeIdentifier(attr);
-    return `attributes->>'${safe}'`;
+/**
+ * PGlite/Bun may store JSONB as a string (double-encoded). Use #>> '{}' to extract
+ * the root, then ::jsonb to parse, so we get the actual object for attribute access.
+ */
+function jsonbAttrs(prefix = ""): string {
+    return `(${prefix}attributes #>> '{}')::jsonb`;
 }
 
-/** Escape string for safe embedding in SQL literal */
-function escapeSqlString(s: string): string {
+/** Use literal key (sanitized) for JSONB access - avoids parameter binding issues with dynamic keys */
+function jsonAttrLiteral(attr: string, prefix = ""): string {
+    const safe = sanitizeIdentifier(attr);
+    return `${jsonbAttrs(prefix)}->>'${safe}'`;
+}
+
+/** Escape string for safe SQL literal */
+function escapeSqlLiteral(s: string): string {
     return s.replace(/\\/g, "\\\\").replace(/'/g, "''");
 }
 
-/** Build equality using ->> with literal value - avoids param binding issues */
-function jsonEqualsLiteral(attr: string, value: unknown): string {
-    const safe = sanitizeIdentifier(attr);
+/** Build equality using ->> (returns text) with literal - PGlite has issues with jsonb param binding */
+function jsonEqualsLiteral(attr: string, value: unknown, prefix = ""): string {
     const val =
         typeof value === "string"
-            ? `'${escapeSqlString(value)}'`
+            ? `'${escapeSqlLiteral(value)}'`
             : typeof value === "number"
-              ? String(value)
-              : `'${escapeSqlString(JSON.stringify(value))}'`;
-    return `(${jsonAttrLiteral(attr)})::text = ${val}::text`;
+              ? `'${String(value)}'`
+              : `'${escapeSqlLiteral(JSON.stringify(value))}'`;
+    return `(${jsonAttrLiteral(attr, prefix)}) = ${val}`;
 }
 
-export function buildWhereClause(clause: PatchesDbQueryWhereClause): WhereFragment {
+export function buildWhereClause(clause: PatchesDbQueryWhereClause, prefix = ""): WhereFragment {
     switch (clause.type) {
         case "=":
-            return { sql: jsonEqualsLiteral(clause.attribute, clause.value), params: [] };
+            return { sql: jsonEqualsLiteral(clause.attribute, clause.value, prefix), params: [] };
         case "!=":
-            return { sql: `NOT (${jsonEqualsLiteral(clause.attribute, clause.value)})`, params: [] };
+            return { sql: `NOT (${jsonEqualsLiteral(clause.attribute, clause.value, prefix)})`, params: [] };
         case "gt":
-            return { sql: `(${jsonAttrLiteral(clause.attribute)})::numeric > ?::numeric`, params: [clause.value] };
+            return { sql: `(${jsonAttrLiteral(clause.attribute, prefix)})::numeric > ?::numeric`, params: [clause.value] };
         case "gte":
-            return { sql: `(${jsonAttrLiteral(clause.attribute)})::numeric >= ?::numeric`, params: [clause.value] };
+            return { sql: `(${jsonAttrLiteral(clause.attribute, prefix)})::numeric >= ?::numeric`, params: [clause.value] };
         case "lt":
-            return { sql: `(${jsonAttrLiteral(clause.attribute)})::numeric < ?::numeric`, params: [clause.value] };
+            return { sql: `(${jsonAttrLiteral(clause.attribute, prefix)})::numeric < ?::numeric`, params: [clause.value] };
         case "lte":
-            return { sql: `(${jsonAttrLiteral(clause.attribute)})::numeric <= ?::numeric`, params: [clause.value] };
+            return { sql: `(${jsonAttrLiteral(clause.attribute, prefix)})::numeric <= ?::numeric`, params: [clause.value] };
         case "contains":
-            return { sql: `${jsonAttrLiteral(clause.attribute)} LIKE '%' || ? || '%'`, params: [clause.value] };
+            return { sql: `${jsonAttrLiteral(clause.attribute, prefix)} LIKE '%' || ? || '%'`, params: [clause.value] };
         case "in": {
             const placeholders = clause.values.map(() => "?::text").join(", ");
             return {
-                sql: `${jsonAttrLiteral(clause.attribute)} IN (${placeholders})`,
+                sql: `${jsonAttrLiteral(clause.attribute, prefix)} IN (${placeholders})`,
                 params: [...clause.values],
             };
         }
         case "not_in": {
             const placeholders = clause.values.map(() => "?::text").join(", ");
             return {
-                sql: `${jsonAttrLiteral(clause.attribute)} NOT IN (${placeholders})`,
+                sql: `${jsonAttrLiteral(clause.attribute, prefix)} NOT IN (${placeholders})`,
                 params: [...clause.values],
             };
         }
         case "exists":
-            return { sql: `attributes->'${sanitizeIdentifier(clause.attribute)}' IS NOT NULL`, params: [] };
+            return { sql: `${jsonbAttrs(prefix)}->'${sanitizeIdentifier(clause.attribute)}' IS NOT NULL`, params: [] };
         case "not_exists":
-            return { sql: `attributes->'${sanitizeIdentifier(clause.attribute)}' IS NULL`, params: [] };
+            return { sql: `${jsonbAttrs(prefix)}->'${sanitizeIdentifier(clause.attribute)}' IS NULL`, params: [] };
         case "and": {
-            const parts = clause.clauses.map(buildWhereClause);
+            const parts = clause.clauses.map(c => buildWhereClause(c, prefix));
             return { sql: `(${parts.map(p => p.sql).join(" AND ")})`, params: parts.flatMap(p => p.params) };
         }
         case "or": {
-            const parts = clause.clauses.map(buildWhereClause);
+            const parts = clause.clauses.map(c => buildWhereClause(c, prefix));
             return { sql: `(${parts.map(p => p.sql).join(" OR ")})`, params: parts.flatMap(p => p.params) };
         }
         case "not": {
-            const inner = buildWhereClause(clause.clause);
+            const inner = buildWhereClause(clause.clause, prefix);
             return { sql: `NOT (${inner.sql})`, params: inner.params };
         }
     }
 }
 
-export function buildSnapshotConditions(query: PatchesDbQuery): { conditions: string[]; params: unknown[] } {
-    const conditions: string[] = ["entity_type = ?"];
+export function buildSnapshotConditions(query: PatchesDbQuery, tablePrefix = ""): { conditions: string[]; params: unknown[] } {
+    const conditions: string[] = [`${tablePrefix}entity_type = ?`];
     const params: unknown[] = [query.entityType];
 
     if (query.entityId != null) {
         if (Array.isArray(query.entityId)) {
             const placeholders = query.entityId.map(() => "?").join(", ");
-            conditions.push(`entity_id IN (${placeholders})`);
+            conditions.push(`${tablePrefix}entity_id IN (${placeholders})`);
             params.push(...query.entityId);
         } else {
-            conditions.push("entity_id = ?");
+            conditions.push(`${tablePrefix}entity_id = ?`);
             params.push(query.entityId);
         }
     }
 
     if (query.where) {
-        const fragment = buildWhereClause(query.where);
+        const fragment = buildWhereClause(query.where, tablePrefix);
         conditions.push(fragment.sql);
         params.push(...fragment.params);
     }
@@ -107,13 +114,14 @@ export function buildSnapshotConditions(query: PatchesDbQuery): { conditions: st
 
 export function buildOrderSQL(query: PatchesDbQuery, defaultOrder: string, attributePrefix = ""): string {
     if (query.orderBy && query.orderBy.length > 0) {
+        const attrsExpr = jsonbAttrs(attributePrefix);
         return (
             "ORDER BY " +
             query.orderBy
                 .map(o => {
                     const attr = sanitizeIdentifier(o.attribute);
                     const dir = o.direction === "desc" ? "DESC" : "ASC";
-                    return `${attributePrefix}attributes->>'${attr}' ${dir}`;
+                    return `${attrsExpr}->>'${attr}' ${dir}`;
                 })
                 .join(", ")
         );

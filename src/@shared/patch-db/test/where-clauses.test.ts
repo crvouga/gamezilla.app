@@ -13,7 +13,7 @@ describe.each(implementations)("$name", ({ name, factory }) => {
     });
 
     afterEach(async () => {
-        await teardown();
+        if (teardown) await teardown();
     });
 
     afterAll(async () => {
