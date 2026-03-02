@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { PatchesDb } from "../interface";
-import { implementations, whereClauseFixtures } from "./test-helpers";
+import { implementations, teardownPostgresTests, whereClauseFixtures } from "./test-helpers";
 
-describe.each(implementations)("$name", ({ factory }) => {
+describe.each(implementations)("$name", ({ name, factory }) => {
     let db: PatchesDb;
     let teardown: () => Promise<void>;
 
@@ -16,9 +16,24 @@ describe.each(implementations)("$name", ({ factory }) => {
         await teardown();
     });
 
+    afterAll(async () => {
+        if (name === "PatchDbImplPostgres") await teardownPostgresTests();
+    });
+
     describe("where clauses", () => {
         beforeEach(async () => {
             await db.write(whereClauseFixtures);
+        });
+
+        test("entities without filter returns all", async () => {
+            const all = await db.entities({ entityType: "item" });
+            expect(all.data).toHaveLength(4);
+        });
+
+        test("entityId filter works", async () => {
+            const result = await db.entities({ entityType: "item", entityId: "t1" });
+            expect(result.data).toHaveLength(1);
+            expect(result.data[0].attributes.tag).toBe("a");
         });
 
         test("where = matches exact value", async () => {

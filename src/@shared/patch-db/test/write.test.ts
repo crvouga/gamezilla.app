@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { PatchesDb } from "../interface";
-import { implementations, makePatch } from "./test-helpers";
+import { implementations, makePatch, teardownPostgresTests } from "./test-helpers";
 
-describe.each(implementations)("$name", ({ factory }) => {
+describe.each(implementations)("$name", ({ name, factory }) => {
     let db: PatchesDb;
     let teardown: () => Promise<void>;
 
@@ -14,6 +14,10 @@ describe.each(implementations)("$name", ({ factory }) => {
 
     afterEach(async () => {
         await teardown();
+    });
+
+    afterAll(async () => {
+        if (name === "PatchDbImplPostgres") await teardownPostgresTests();
     });
 
     test("write patches, merge into entity, null deletes attribute, parentId is auto-populated", async () => {
