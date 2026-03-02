@@ -1,16 +1,13 @@
 import type { Entity } from "@/@shared/patch-db/interface";
 import { useEntities, useEntity, usePatchesDb } from "@/@shared/patch-db/react";
+import { useTheme } from "@/@shared/theme";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { useState } from "react";
 import {
     KeyboardAvoidingView,
     Platform,
     Pressable,
-    StyleSheet,
     TextInput,
 } from "react-native";
 
@@ -61,27 +58,26 @@ function TodoItem({
     onToggle: () => void;
     onDelete: () => void;
 }) {
-    const colorScheme = useColorScheme();
-    const tint = Colors[colorScheme ?? "light"].tint;
+    const theme = useTheme();
     const entity = useEntity({ entityId, entityType: "todo" });
     const completed = entity?.attributes.completed === true;
     const title = (entity?.attributes.title as string) ?? "";
 
     return (
-        <ThemedView style={styles.todoRow}>
-            <Pressable onPress={onToggle} style={styles.todoToggleArea}>
-                <ThemedText style={[styles.checkboxText, completed && styles.completedText]}>
+        <ThemedView style={theme.sx({ flexDirection: "row", alignItems: "center", py: 3, px: 0, gap: 3, borderBottomWidth: "hairline", borderColor: "border" })}>
+            <Pressable onPress={onToggle} style={theme.sx({ flex: 1, flexDirection: "row", alignItems: "center", gap: 3 })}>
+                <ThemedText style={[theme.sx({ fontSize: 20 }), completed && theme.sx({ textDecorationLine: "line-through", opacity: 0.6 })]}>
                     {completed ? "✓" : "○"}
                 </ThemedText>
                 <ThemedText
-                    style={[styles.todoTitle, completed && styles.completedText]}
+                    style={[theme.sx({ flex: 1, fontSize: 16 }), completed && theme.sx({ textDecorationLine: "line-through", opacity: 0.6 })]}
                     numberOfLines={1}
                 >
                     {title || "(untitled)"}
                 </ThemedText>
             </Pressable>
-            <Pressable onPress={onDelete} style={styles.deleteButton} hitSlop={8}>
-                <ThemedText style={[styles.deleteText, { color: tint }]}>Delete</ThemedText>
+            <Pressable onPress={onDelete} style={theme.sx({ p: 1 })} hitSlop={8}>
+                <ThemedText style={[theme.sx({ fontSize: 14 }), { color: theme.colors.tint }]}>Delete</ThemedText>
             </Pressable>
         </ThemedView>
     );
@@ -90,6 +86,7 @@ function TodoItem({
 type Filter = "all" | "active" | "completed";
 
 export function TodoList() {
+    const theme = useTheme();
     const db = usePatchesDb();
     const [input, setInput] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
@@ -97,13 +94,6 @@ export function TodoList() {
     const filterResult = useEntities(buildTodoQuery(filter));
     const todos = filterResult.data as TodoEntity[];
     const totalCount = allResult.total;
-    const filterActiveBg = useThemeColor({
-        light: "rgba(10, 126, 164, 0.2)",
-        dark: "rgba(255, 255, 255, 0.15)"
-    }, "tint");
-    const inputBg = useThemeColor({}, "background");
-    const inputColor = useThemeColor({}, "text");
-    const borderColor = useThemeColor({ light: "#ccc", dark: "#444" }, "icon");
 
     const addTodo = async () => {
         const title = input.trim();
@@ -145,58 +135,61 @@ export function TodoList() {
         ]);
     };
 
+    const filterButtonStyle = (active: boolean) =>
+        theme.sx({
+            py: 1.5,
+            px: 3,
+            borderRadius: 8,
+            ...(active && { backgroundColor: theme.colors.tintMuted }),
+        });
+
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.container}
+            style={theme.sx({ flex: 1, p: 4 })}
         >
-            <ThemedView style={styles.header}>
+            <ThemedView style={theme.sx({ mb: 4 })}>
                 <ThemedText type="title">Todos</ThemedText>
                 <ThemedText type="subtitle">Powered by patch-db</ThemedText>
             </ThemedView>
-            <ThemedView style={styles.filterRow}>
-                <Pressable
-                    onPress={() => setFilter("all")}
-                    style={[styles.filterButton, filter === "all" && { backgroundColor: filterActiveBg }]}
-                >
-                    <ThemedText style={filter === "all" ? styles.filterTextActive : undefined}>
-                        All
-                    </ThemedText>
+            <ThemedView style={theme.sx({ flexDirection: "row", gap: 2, mb: 3 })}>
+                <Pressable onPress={() => setFilter("all")} style={filterButtonStyle(filter === "all")}>
+                    <ThemedText style={filter === "all" ? theme.sx({ fontWeight: "600" }) : undefined}>All</ThemedText>
                 </Pressable>
-                <Pressable
-                    onPress={() => setFilter("active")}
-                    style={[styles.filterButton, filter === "active" && { backgroundColor: filterActiveBg }]}
-                >
-                    <ThemedText style={filter === "active" ? styles.filterTextActive : undefined}>
-                        Active
-                    </ThemedText>
+                <Pressable onPress={() => setFilter("active")} style={filterButtonStyle(filter === "active")}>
+                    <ThemedText style={filter === "active" ? theme.sx({ fontWeight: "600" }) : undefined}>Active</ThemedText>
                 </Pressable>
-                <Pressable
-                    onPress={() => setFilter("completed")}
-                    style={[styles.filterButton, filter === "completed" && { backgroundColor: filterActiveBg }]}
-                >
-                    <ThemedText style={filter === "completed" ? styles.filterTextActive : undefined}>
-                        Completed
-                    </ThemedText>
+                <Pressable onPress={() => setFilter("completed")} style={filterButtonStyle(filter === "completed")}>
+                    <ThemedText style={filter === "completed" ? theme.sx({ fontWeight: "600" }) : undefined}>Completed</ThemedText>
                 </Pressable>
             </ThemedView>
-            <ThemedView style={styles.inputRow}>
+            <ThemedView style={theme.sx({ flexDirection: "row", gap: 2, mb: 4 })}>
                 <TextInput
-                    style={[styles.input, { backgroundColor: inputBg, color: inputColor, borderColor }]}
+                    style={theme.sx({
+                        flex: 1,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        px: 3,
+                        py: 2.5,
+                        fontSize: 16,
+                        background: "paper",
+                        color: "text",
+                        borderColor: "border",
+                    })}
                     placeholder="Add a todo..."
-                    placeholderTextColor={Colors.light.icon}
+                    placeholderTextColor={theme.colors.icon}
                     value={input}
                     onChangeText={setInput}
                     onSubmitEditing={addTodo}
                     returnKeyType="done"
                 />
-                <Pressable onPress={addTodo} style={styles.addButton}>
+                <Pressable onPress={addTodo} style={theme.sx({ justifyContent: "center", px: 4 })}>
                     <ThemedText type="defaultSemiBold">Add</ThemedText>
                 </Pressable>
             </ThemedView>
-            <ThemedView style={styles.list}>
+            <ThemedView style={theme.sx({ flex: 1 })}>
                 {todos.length === 0 ? (
-                    <ThemedText style={styles.empty}>
+                    <ThemedText style={theme.sx({ opacity: 0.7, fontStyle: "italic" })}>
                         {filter === "all" ? "No todos yet. Add one above!" : `No ${filter} todos.`}
                     </ThemedText>
                 ) : (
@@ -213,86 +206,3 @@ export function TodoList() {
         </KeyboardAvoidingView>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: 16,
-    },
-    header: {
-        marginBottom: 16,
-    },
-    filterRow: {
-        flexDirection: "row",
-        gap: 8,
-        marginBottom: 12,
-    },
-    filterButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-    },
-    filterTextActive: {
-        fontWeight: "600",
-    },
-    inputRow: {
-        flexDirection: "row",
-        gap: 8,
-        marginBottom: 16,
-    },
-    input: {
-        flex: 1,
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontSize: 16,
-    },
-    addButton: {
-        justifyContent: "center",
-        paddingHorizontal: 16,
-    },
-    list: {
-        flex: 1,
-    },
-    todoRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 12,
-        paddingHorizontal: 0,
-        gap: 12,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: "#ccc",
-    },
-    todoToggleArea: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-    },
-    checkbox: {
-        width: 28,
-        alignItems: "center",
-    },
-    checkboxText: {
-        fontSize: 20,
-    },
-    todoTitle: {
-        flex: 1,
-        fontSize: 16,
-    },
-    completedText: {
-        textDecorationLine: "line-through",
-        opacity: 0.6,
-    },
-    deleteButton: {
-        padding: 4,
-    },
-    deleteText: {
-        fontSize: 14,
-    },
-    empty: {
-        opacity: 0.7,
-        fontStyle: "italic",
-    },
-});

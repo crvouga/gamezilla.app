@@ -1,14 +1,13 @@
 import type { Entity } from "@/@shared/patch-db/interface";
 import { useEntities, usePatchesDb } from "@/@shared/patch-db/react";
+import { useTheme } from "@/@shared/theme";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
     FlatList,
     Pressable,
-    StyleSheet,
     TextInput,
 } from "react-native";
 
@@ -43,6 +42,7 @@ function useTodoCountByList() {
 }
 
 export function TodoListsOverview() {
+    const theme = useTheme();
     const router = useRouter();
     const db = usePatchesDb();
     const [input, setInput] = useState("");
@@ -58,14 +58,6 @@ export function TodoListsOverview() {
     });
     const lists = (listsResult.data ?? []) as TodoListEntity[];
     const todoCounts = useTodoCountByList();
-
-    const filterActiveBg = useThemeColor({
-        light: "rgba(10, 126, 164, 0.2)",
-        dark: "rgba(255, 255, 255, 0.15)",
-    }, "tint");
-    const inputBg = useThemeColor({}, "background");
-    const inputColor = useThemeColor({}, "text");
-    const borderColor = useThemeColor({ light: "#ccc", dark: "#444" }, "icon");
 
     const addList = async () => {
         const name = input.trim();
@@ -105,18 +97,28 @@ export function TodoListsOverview() {
     ];
 
     return (
-        <ThemedView style={styles.container}>
-            <ThemedView style={styles.header}>
+        <ThemedView style={theme.sx({ flex: 1, p: 4 })}>
+            <ThemedView style={theme.sx({ mb: 4 })}>
                 <ThemedText type="title">Todo Lists</ThemedText>
                 <ThemedText type="subtitle">Group your todos by list</ThemedText>
             </ThemedView>
 
             {adding ? (
-                <ThemedView style={styles.inputRow}>
+                <ThemedView style={theme.sx({ flexDirection: "row", gap: 2, mb: 3 })}>
                     <TextInput
-                        style={[styles.input, { backgroundColor: inputBg, color: inputColor, borderColor }]}
+                        style={theme.sx({
+                            flex: 1,
+                            borderWidth: 1,
+                            borderRadius: 8,
+                            px: 3,
+                            py: 2.5,
+                            fontSize: 16,
+                            background: "paper",
+                            color: "text",
+                            borderColor: "border",
+                        })}
                         placeholder="List name..."
-                        placeholderTextColor="#888"
+                        placeholderTextColor={theme.colors.icon}
                         value={input}
                         onChangeText={setInput}
                         onSubmitEditing={addList}
@@ -125,14 +127,14 @@ export function TodoListsOverview() {
                         }}
                         autoFocus
                     />
-                    <Pressable onPress={addList} style={styles.addButton}>
+                    <Pressable onPress={addList} style={theme.sx({ justifyContent: "center", px: 4 })}>
                         <ThemedText type="defaultSemiBold">Add</ThemedText>
                     </Pressable>
                 </ThemedView>
             ) : (
                 <Pressable
                     onPress={() => setAdding(true)}
-                    style={[styles.addListButton, { backgroundColor: filterActiveBg }]}
+                    style={[theme.sx({ py: 3, px: 4, borderRadius: 8, mb: 4, alignItems: "center" }), { backgroundColor: theme.colors.tintMuted }]}
                 >
                     <ThemedText type="defaultSemiBold">+ New List</ThemedText>
                 </Pressable>
@@ -141,22 +143,30 @@ export function TodoListsOverview() {
             <FlatList
                 data={data}
                 keyExtractor={(item) => item.id}
-                style={styles.list}
-                contentContainerStyle={styles.listContent}
+                style={theme.sx({ flex: 1 })}
+                contentContainerStyle={theme.sx({ paddingBottom: 24 })}
                 renderItem={({ item }) => (
                     <Pressable
                         onPress={() => openList(item.id)}
                         style={({ pressed }) => [
-                            styles.listRow,
-                            pressed && styles.listRowPressed,
+                            theme.sx({
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                py: 3.5,
+                                px: 3,
+                                borderRadius: 8,
+                                mb: 1,
+                            }),
+                            pressed && theme.sx({ opacity: 0.7 }),
                         ]}
                     >
-                        <ThemedText style={styles.listName}>{item.name}</ThemedText>
-                        <ThemedText style={styles.listCount}>{item.count}</ThemedText>
+                        <ThemedText style={theme.sx({ fontSize: 17, fontWeight: "500" })}>{item.name}</ThemedText>
+                        <ThemedText style={theme.sx({ fontSize: 15, opacity: 0.6 })}>{item.count}</ThemedText>
                     </Pressable>
                 )}
                 ListEmptyComponent={
-                    <ThemedText style={styles.empty}>
+                    <ThemedText style={theme.sx({ opacity: 0.7, fontStyle: "italic", mt: 6 })}>
                         No lists yet. Create one above or add todos to Inbox.
                     </ThemedText>
                 }
@@ -164,68 +174,3 @@ export function TodoListsOverview() {
         </ThemedView>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: 16,
-    },
-    header: {
-        marginBottom: 16,
-    },
-    inputRow: {
-        flexDirection: "row",
-        gap: 8,
-        marginBottom: 12,
-    },
-    input: {
-        flex: 1,
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontSize: 16,
-    },
-    addButton: {
-        justifyContent: "center",
-        paddingHorizontal: 16,
-    },
-    addListButton: {
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        marginBottom: 16,
-        alignItems: "center",
-    },
-    list: {
-        flex: 1,
-    },
-    listContent: {
-        paddingBottom: 24,
-    },
-    listRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingVertical: 14,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        marginBottom: 4,
-    },
-    listRowPressed: {
-        opacity: 0.7,
-    },
-    listName: {
-        fontSize: 17,
-        fontWeight: "500",
-    },
-    listCount: {
-        fontSize: 15,
-        opacity: 0.6,
-    },
-    empty: {
-        opacity: 0.7,
-        fontStyle: "italic",
-        marginTop: 24,
-    },
-});

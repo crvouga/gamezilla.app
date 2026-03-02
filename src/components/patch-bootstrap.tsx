@@ -1,12 +1,14 @@
 import type { Container } from "@/@shared/dependency-injection/dependency-injection-container";
 import { ContainerProvider } from "@/@shared/dependency-injection/react";
+import { useTheme } from "@/@shared/theme";
 import { bootstrapPatchDbExpoSync } from "@/@shared/patch-db/bootstrap-expo";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useEffect, useState, type ReactNode } from "react";
-import { ActivityIndicator, StyleSheet } from "react-native";
+import { ActivityIndicator } from "react-native";
 
 export function PatchBootstrap({ children }: { children: ReactNode }) {
+    const theme = useTheme();
     const [container, setContainer] = useState<Container | null>(null);
 
     useEffect(() => {
@@ -25,24 +27,12 @@ export function PatchBootstrap({ children }: { children: ReactNode }) {
 
     if (!container) {
         return (
-            <ThemedView style={styles.loading}>
+            <ThemedView style={theme.sx({ flex: 1, justifyContent: "center", alignItems: "center", gap: 4 })}>
                 <ActivityIndicator size="large" />
-                <ThemedText style={styles.loadingText}>Loading container...</ThemedText>
+                <ThemedText style={theme.sx({ fontSize: 16 })}>Loading container...</ThemedText>
             </ThemedView>
         );
     }
 
     return <ContainerProvider container={container}>{children}</ContainerProvider>;
 }
-
-const styles = StyleSheet.create({
-    loading: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 16,
-    },
-    loadingText: {
-        fontSize: 16,
-    },
-});

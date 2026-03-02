@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import { ThemeProvider as AppThemeProvider } from '@/@shared/theme';
 import { PatchBootstrap } from '@/components/patch-bootstrap';
 import { useColorScheme } from '../hooks/use-color-scheme';
 
@@ -12,8 +13,10 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const scheme = colorScheme ?? 'light';
 
   return (
+    <AppThemeProvider colorScheme={scheme}>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <PatchBootstrap>
         <Stack>
@@ -23,5 +26,6 @@ export default function RootLayout() {
         <StatusBar style="auto" />
       </PatchBootstrap>
     </ThemeProvider>
+    </AppThemeProvider>
   );
 }
