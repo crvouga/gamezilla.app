@@ -1,18 +1,18 @@
 export type PatchInput = {
-    patchId: string;
     entityId: string;
     entityType: string;
     attributes: Record<string, unknown>;
-    createdAt: string;
-    recordedAt: string;
-    createdBy: string;
-    sessionId: string;
-    /** Dynamic metadata (e.g. syncedAt) stored in metadata column */
+    /** Dynamic metadata (e.g. createdBy, sessionId, syncedAt) stored in metadata column */
     meta?: Record<string, unknown>;
 }
 
 export type Patch = PatchInput & {
+    patchId: string;
     parentId: string | null;
+    createdAt: string;
+    recordedAt: string;
+    createdBy: string;
+    sessionId: string;
 }
 
 export type Entity = {
@@ -97,7 +97,7 @@ export type PatchesDbResult<T> = {
 }
 
 export interface PatchesDb {
-    write(patches: PatchInput[]): Promise<void>;
+    patch(patches: PatchInput[]): Promise<Patch[]>;
     read(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>>;
     entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>>;
 }

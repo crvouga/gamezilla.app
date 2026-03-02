@@ -1,5 +1,4 @@
 import type { Entity } from "@/@shared/patch-db/interface";
-import { makePatchInput } from "@/@shared/patch-db/make-patch";
 import { useEntities, useEntity, usePatchesDb } from "@/@shared/patch-db/react";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -38,24 +37,24 @@ function buildTodoQuery(listId: string, filter: Filter) {
     const listClause =
         listId === INBOX_LIST_ID
             ? {
-                  type: "or" as const,
-                  clauses: [
-                      { type: "not_exists" as const, attribute: "listId" },
-                      { type: "=" as const, attribute: "listId", value: null },
-                      { type: "=" as const, attribute: "listId", value: "" },
-                  ],
-              }
+                type: "or" as const,
+                clauses: [
+                    { type: "not_exists" as const, attribute: "listId" },
+                    { type: "=" as const, attribute: "listId", value: null },
+                    { type: "=" as const, attribute: "listId", value: "" },
+                ],
+            }
             : { type: "=" as const, attribute: "listId", value: listId };
 
     const where =
         filter === "all"
             ? { type: "and" as const, clauses: [DELETED_CLAUSE, listClause] }
             : filter === "active"
-              ? {
+                ? {
                     type: "and" as const,
                     clauses: [DELETED_CLAUSE, listClause, ACTIVE_CLAUSE],
                 }
-              : {
+                : {
                     type: "and" as const,
                     clauses: [
                         DELETED_CLAUSE,
@@ -148,10 +147,8 @@ export function TodoListDetail() {
         const title = input.trim();
         if (!title) return;
         const entityId = crypto.randomUUID();
-        const patchId = crypto.randomUUID();
-        await db.write([
-            makePatchInput({
-                patchId,
+        await db.patch([
+            {
                 entityId,
                 entityType: "todo",
                 attributes: {
@@ -161,31 +158,28 @@ export function TodoListDetail() {
                     createdAt: new Date().toISOString(),
                     ...(lid !== INBOX_LIST_ID && { listId: lid }),
                 },
-            }),
+            },
         ]);
         setInput("");
     };
 
     const toggleTodo = async (entity: TodoEntity) => {
-        const completed = entity.attributes.completed === true;
-        await db.write([
-            makePatchInput({
-                patchId: crypto.randomUUID(),
+        await db.patch([
+            {
                 entityId: entity.entityId,
                 entityType: "todo",
-                attributes: { completed: !completed },
-            }),
+                attributes: { completed: !Boolean(entity.attributes.completed) },
+            },
         ]);
     };
 
     const deleteTodo = async (entity: TodoEntity) => {
-        await db.write([
-            makePatchInput({
-                patchId: crypto.randomUUID(),
+        await db.patch([
+            {
                 entityId: entity.entityId,
                 entityType: "todo",
                 attributes: { deleted: true },
-            }),
+            },
         ]);
     };
 

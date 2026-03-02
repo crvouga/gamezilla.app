@@ -38,7 +38,7 @@ export class PatchDbImplHttp implements PatchesDb {
         return this.post<PatchesDbResult<Entity>>(ENTITIES_QUERY, { query });
     }
 
-    async write(patches: PatchInput[]): Promise<void> {
-        await this.post(PATCHES_WRITE, { patches });
+    async patch(patches: PatchInput[]): Promise<Patch[]> {
+        return this.post<Patch[]>(PATCHES_WRITE, { patches });
     }
 }

@@ -104,25 +104,42 @@ export class PatchDbImplSqlite implements SyncStatePatchesDb {
         return rows.length > 0 ? rows[0].patch_id : null;
     }
 
-    async write(patches: PatchInput[]): Promise<void> {
-        if (patches.length === 0) return;
+    async patch(patches: PatchInput[]): Promise<Patch[]> {
+        if (patches.length === 0) return [];
+        const result: Patch[] = [];
         await this.sqlClient.transaction(async (tx) => {
             const touchedEntities = new Set<string>();
+            let lastTimestamp = Date.now() - 1;
             for (const patch of patches) {
+                const patchId = ("patchId" in patch && typeof patch.patchId === "string")
+                    ? patch.patchId
+                    : crypto.randomUUID();
                 const parentId = await this.resolveParentId(tx, patch.entityId, patch.entityType);
+                lastTimestamp += 1;
+                const now = new Date(lastTimestamp).toISOString();
                 await tx.run(
                     insertPatch,
                     [
-                        patch.patchId,
+                        patchId,
                         patch.entityId,
                         patch.entityType,
                         JSON.stringify(patch.attributes),
-                        patch.createdAt,
-                        patch.recordedAt,
+                        now,
+                        now,
                         parentId,
                         toMetadata(patch),
                     ]
                 );
+                const meta = patch.meta ?? {};
+                result.push({
+                    ...patch,
+                    patchId,
+                    parentId,
+                    createdAt: now,
+                    recordedAt: now,
+                    createdBy: String(meta.createdBy ?? ""),
+                    sessionId: meta.sessionId != null ? String(meta.sessionId) : "",
+                });
                 touchedEntities.add(`${patch.entityId}\0${patch.entityType}`);
             }
 
@@ -131,6 +148,7 @@ export class PatchDbImplSqlite implements SyncStatePatchesDb {
                 await this.recomputeSnapshot(tx, entityId, entityType);
             }
         });
+        return result;
     }
 
     async read(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {

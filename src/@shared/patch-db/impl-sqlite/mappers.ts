@@ -27,10 +27,11 @@ export function toEntity(row: SnapshotRow): Entity {
 }
 
 export function toMetadata(patch: PatchInput): string {
+    const meta = patch.meta ?? {};
     return JSON.stringify({
-        createdBy: patch.createdBy,
-        sessionId: patch.sessionId,
+        createdBy: meta.createdBy ?? "",
+        sessionId: meta.sessionId ?? "",
         syncedAt: null,
-        ...(patch.meta ?? {}),
+        ...meta,
     });
 }

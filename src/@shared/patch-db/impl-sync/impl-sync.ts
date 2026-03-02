@@ -53,13 +53,14 @@ export class SyncPatchesDb implements PatchesDb {
         this.ensurePushTimer();
     }
 
-    async write(patches: PatchInput[]): Promise<void> {
+    async patch(patches: PatchInput[]): Promise<Patch[]> {
         const withUnsynced = patches.map((p) => ({
             ...p,
             meta: { ...p.meta, syncedAt: null },
         }));
-        await this.local.write(withUnsynced);
+        const result = await this.local.patch(withUnsynced);
         this.pubSub.publish(PATCHES_DB_TOPIC, { type: "invalidated" });
+        return result;
     }
 
     read(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
@@ -141,7 +142,7 @@ export class SyncPatchesDb implements PatchesDb {
         try {
             const patches = await this.local.getUnsyncedPatches();
             if (patches.length === 0) return;
-            await this.remote.write(patches);
+            await this.remote.patch(patches);
             await this.local.markPatchesSynced(patches.map((p) => p.patchId));
             this.pubSub.publish(PATCHES_DB_TOPIC, { type: "invalidated" });
         } catch (err) {
@@ -176,7 +177,7 @@ export class SyncPatchesDb implements PatchesDb {
                         ...p,
                         meta: { ...p.meta, syncedAt: new Date().toISOString() },
                     }));
-                    await this.local.write(withSynced);
+                    await this.local.patch(withSynced);
                     hasNewPatches = true;
                 }
             }

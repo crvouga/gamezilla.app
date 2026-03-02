@@ -22,7 +22,7 @@ describe.each(implementations)("$name", ({ name, factory }) => {
 
     describe("where clauses", () => {
         beforeEach(async () => {
-            await db.write(whereClauseFixtures);
+            await db.patch(whereClauseFixtures);
         });
 
         test("entities without filter returns all", async () => {

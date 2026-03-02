@@ -24,9 +24,9 @@ export function createPatchDbHttpHandlers(db: PatchesDb): (req: Request) => Prom
         }
 
         if (url.pathname === PATCHES_WRITE && req.method === "POST") {
-            const body = (await req.json()) as { patches: Parameters<PatchesDb["write"]>[0] };
-            await db.write(body.patches);
-            return Response.json({ ok: true });
+            const body = (await req.json()) as { patches: Parameters<PatchesDb["patch"]>[0] };
+            const patches = await db.patch(body.patches);
+            return Response.json(patches);
         }
 
         return new Response("Not Found", { status: 404 });

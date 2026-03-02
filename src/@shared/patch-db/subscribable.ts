@@ -17,9 +17,10 @@ export const SubscribablePatchesDbToken: InjectionToken<SubscribablePatchesDbLik
 export class SubscribablePatchesDb implements PatchesDb {
     constructor(private db: PatchesDb, private pubSub: PubSub) { }
 
-    async write(patches: PatchInput[]): Promise<void> {
-        await this.db.write(patches);
+    async patch(patches: PatchInput[]): Promise<Patch[]> {
+        const result = await this.db.patch(patches);
         this.pubSub.publish(PATCHES_DB_TOPIC, { type: "invalidated" });
+        return result;
     }
 
     read(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {

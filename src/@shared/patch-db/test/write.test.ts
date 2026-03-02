@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { PatchesDb } from "../interface";
-import { implementations, makePatch, teardownPostgresTests } from "./test-helpers";
+import { implementations, teardownPostgresTests } from "./test-helpers";
 
 describe.each(implementations)("$name", ({ name, factory }) => {
     let db: PatchesDb;
@@ -21,39 +21,39 @@ describe.each(implementations)("$name", ({ name, factory }) => {
     });
 
     test("write patches, merge into entity, null deletes attribute, parentId is auto-populated", async () => {
-        const p1 = makePatch({
-            patchId: "p1",
+        const p1 = {
             entityId: "e1",
             entityType: "task",
             attributes: { title: "Buy milk", priority: "low", status: "open" },
-            createdAt: "2025-01-01T00:00:00Z",
-        });
+        };
 
-        const p2 = makePatch({
-            patchId: "p2",
+        const p2 = {
             entityId: "e1",
             entityType: "task",
             attributes: { priority: "high", assignee: "alice" },
-            createdAt: "2025-01-01T00:01:00Z",
-        });
+        };
 
-        const p3 = makePatch({
-            patchId: "p3",
+        const p3 = {
             entityId: "e1",
             entityType: "task",
             attributes: { priority: null },
-            createdAt: "2025-01-01T00:02:00Z",
-        });
+        };
 
-        await db.write([p1, p2, p3]);
+        const written = await db.patch([p1, p2, p3]);
+        expect(written).toHaveLength(3);
 
         const patchResult = await db.read({ entityType: "task", entityId: "e1" });
         expect(patchResult.data).toHaveLength(3);
         expect(patchResult.total).toBe(3);
 
         expect(patchResult.data[0].parentId).toBeNull();
-        expect(patchResult.data[1].parentId).toBe("p1");
-        expect(patchResult.data[2].parentId).toBe("p2");
+        expect(patchResult.data[1].parentId).toBe(written[0].patchId);
+        expect(patchResult.data[2].parentId).toBe(written[1].patchId);
+
+        expect(patchResult.data[0].createdAt).toBeDefined();
+        expect(patchResult.data[0].recordedAt).toBeDefined();
+        expect(typeof patchResult.data[0].createdAt).toBe("string");
+        expect(typeof patchResult.data[0].recordedAt).toBe("string");
 
         const entityResult = await db.entities({ entityType: "task", entityId: "e1" });
         expect(entityResult.data).toHaveLength(1);

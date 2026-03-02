@@ -1,5 +1,4 @@
 import type { Entity } from "@/@shared/patch-db/interface";
-import { makePatchInput } from "@/@shared/patch-db/make-patch";
 import { useEntities, usePatchesDb } from "@/@shared/patch-db/react";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -75,10 +74,8 @@ export function TodoListsOverview() {
             return;
         }
         const entityId = crypto.randomUUID();
-        const patchId = crypto.randomUUID();
-        await db.write([
-            makePatchInput({
-                patchId,
+        await db.patch([
+            {
                 entityId,
                 entityType: "todoList",
                 attributes: {
@@ -86,7 +83,7 @@ export function TodoListsOverview() {
                     order: lists.length,
                     createdAt: new Date().toISOString(),
                 },
-            }),
+            },
         ]);
         setInput("");
         setAdding(false);

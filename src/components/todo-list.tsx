@@ -1,5 +1,4 @@
 import type { Entity } from "@/@shared/patch-db/interface";
-import { makePatchInput } from "@/@shared/patch-db/make-patch";
 import { useEntities, useEntity, usePatchesDb } from "@/@shared/patch-db/react";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -36,8 +35,8 @@ function buildTodoQuery(filter: Filter) {
         filter === "all"
             ? DELETED_CLAUSE
             : filter === "active"
-              ? { type: "and" as const, clauses: [DELETED_CLAUSE, ACTIVE_CLAUSE] }
-              : {
+                ? { type: "and" as const, clauses: [DELETED_CLAUSE, ACTIVE_CLAUSE] }
+                : {
                     type: "and" as const,
                     clauses: [DELETED_CLAUSE, { type: "=" as const, attribute: "completed", value: true }],
                 };
@@ -110,10 +109,8 @@ export function TodoList() {
         const title = input.trim();
         if (!title) return;
         const entityId = crypto.randomUUID();
-        const patchId = crypto.randomUUID();
-        await db.write([
-            makePatchInput({
-                patchId,
+        await db.patch([
+            {
                 entityId,
                 entityType: "todo",
                 attributes: {
@@ -122,31 +119,29 @@ export function TodoList() {
                     order: totalCount,
                     createdAt: new Date().toISOString(),
                 },
-            }),
+            },
         ]);
         setInput("");
     };
 
     const toggleTodo = async (entity: TodoEntity) => {
         const completed = entity.attributes.completed === true;
-        await db.write([
-            makePatchInput({
-                patchId: crypto.randomUUID(),
+        await db.patch([
+            {
                 entityId: entity.entityId,
                 entityType: "todo",
                 attributes: { completed: !completed },
-            }),
+            },
         ]);
     };
 
     const deleteTodo = async (entity: TodoEntity) => {
-        await db.write([
-            makePatchInput({
-                patchId: crypto.randomUUID(),
+        await db.patch([
+            {
                 entityId: entity.entityId,
                 entityType: "todo",
                 attributes: { deleted: true },
-            }),
+            },
         ]);
     };
 
