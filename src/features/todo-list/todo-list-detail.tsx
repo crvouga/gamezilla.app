@@ -146,10 +146,9 @@ export function TodoListDetail() {
     const addTodo = async () => {
         const title = input.trim();
         if (!title) return;
-        const entityId = crypto.randomUUID();
         await db.patch([
             {
-                entityId,
+                entityId: crypto.randomUUID(),
                 entityType: "todo",
                 attributes: {
                     title,

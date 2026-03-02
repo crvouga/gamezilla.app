@@ -1,3 +1,3 @@
-export const PATCHES_QUERY = "/api/patches/query";
-export const ENTITIES_QUERY = "/api/patches/entities";
-export const PATCHES_WRITE = "/api/patches/write";
+export const PATCHES_QUERY = "/patches-db/patches";
+export const ENTITIES_QUERY = "/patches-db/entities";
+export const PATCHES_WRITE = "/patches-db/patch";
