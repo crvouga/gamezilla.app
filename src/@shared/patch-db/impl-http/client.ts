@@ -25,7 +25,7 @@ export class PatchDbImplHttp implements PatchesDb {
         return res.json() as Promise<T>;
     }
 
-    async read(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
+    async patches(query: PatchesDbQuery): Promise<PatchesDbResult<Patch>> {
         return this.post<PatchesDbResult<Patch>>(PATCHES_QUERY, { query });
     }
 

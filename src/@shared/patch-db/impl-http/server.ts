@@ -7,13 +7,13 @@ export function createPatchDbHttpHandlers(db: PatchesDb): (req: Request) => Prom
 
         if (url.pathname === PATCHES_QUERY && req.method === "POST") {
             const body = (await req.json()) as { query: PatchesDbQuery };
-            const result = await db.read(body.query);
+            const result = await db.patches(body.query);
             return Response.json(result);
         }
 
         if (url.pathname === PATCHES_QUERY_BATCH && req.method === "POST") {
             const body = (await req.json()) as { queries: PatchesDbQuery[] };
-            const results = await Promise.all(body.queries.map((q) => db.read(q)));
+            const results = await Promise.all(body.queries.map((q) => db.patches(q)));
             return Response.json(results);
         }
 
