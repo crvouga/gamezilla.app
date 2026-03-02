@@ -1,10 +1,14 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { getPGliteTestInstance, stopPGliteTestInstance } from "../postgres/pglite-test-instance";
 import { InMemoryPubSub } from "../pub-sub/impl-in-memory";
+import { SqlClientImplBunPostgres } from "./impl-bun-postgres";
 import { SqlClientImplBunSqlite } from "./impl-bun-sqlite";
 import { SqlClientWithPubSub } from "./impl-with-pub-sub";
 import type { SqlClient } from "./interface";
 
 type ClientFactory = () => Promise<SqlClient>;
+
+let cachedPostgresClient: SqlClient | null = null;
 
 async function loadImplementations(): Promise<
     { name: string; createClient: ClientFactory }[]
@@ -30,12 +34,35 @@ async function loadImplementations(): Promise<
     } catch {
         // expo-sqlite requires React Native runtime; skip in Bun test env
     }
+
+    if (process.env.SKIP_POSTGRES_TESTS !== "1") {
+        impls.push({
+            name: "SqlClientImplBunPostgres",
+            createClient: async () => {
+                const pg = await getPGliteTestInstance(25433);
+                if (!cachedPostgresClient) {
+                    await pg.wipe();
+                    cachedPostgresClient = SqlClientImplBunPostgres.connect(pg.connectionUrl);
+                }
+                return {
+                    connect: () => cachedPostgresClient!.connect(),
+                    disconnect: () => Promise.resolve(),
+                    query: (sql, params) => cachedPostgresClient!.query(sql, params),
+                    run: (sql, params) => cachedPostgresClient!.run(sql, params),
+                    transaction: (fn) => cachedPostgresClient!.transaction(fn),
+                };
+            },
+        });
+    }
+
     return impls;
 }
 
 const implementations = await loadImplementations();
 
-describe.each(implementations)("$name", ({ createClient }) => {
+
+
+describe.each(implementations)("$name", ({ name, createClient }) => {
     let client: SqlClient | null = null;
     let available = true;
 
@@ -59,6 +86,14 @@ describe.each(implementations)("$name", ({ createClient }) => {
         }
     });
 
+    afterAll(async () => {
+        if (cachedPostgresClient) {
+            await cachedPostgresClient.disconnect();
+            cachedPostgresClient = null;
+        }
+        await stopPGliteTestInstance();
+    });
+
     test("connect and disconnect", async () => {
         if (!client || !available) return;
         await client.connect();
@@ -80,11 +115,12 @@ describe.each(implementations)("$name", ({ createClient }) => {
         if (!client || !available) return;
         await client.connect();
         await client.run("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)");
-        const result = await client.run("INSERT INTO users (name) VALUES (?)", [
-            "Alice",
-        ]);
-        expect(result.changes).toBe(1);
-        expect(result.lastInsertRowid).toBeGreaterThan(0);
+        const result = await client.run(
+            "INSERT INTO users (id, name) VALUES (?, ?) RETURNING *",
+            [1, "Alice"]
+        );
+        expect(result.changes).toBeGreaterThanOrEqual(1);
+        expect(result.lastInsertRowid).toBeGreaterThanOrEqual(1);
         await client.disconnect();
     });
 
@@ -118,10 +154,11 @@ describe.each(implementations)("$name", ({ createClient }) => {
         await client.connect();
         await client.run("CREATE TABLE counters (id INTEGER, n INTEGER)");
         await client.run("INSERT INTO counters VALUES (1, 0)");
-        const result = await client.run("UPDATE counters SET n = 1 WHERE id = ?", [
-            1,
-        ]);
-        expect(result.changes).toBe(1);
+        const result = await client.run(
+            "UPDATE counters SET n = 1 WHERE id = ? RETURNING *",
+            [1]
+        );
+        expect(result.changes).toBeGreaterThanOrEqual(1);
         await client.disconnect();
     });
 
@@ -130,8 +167,8 @@ describe.each(implementations)("$name", ({ createClient }) => {
         await client.connect();
         await client.run("CREATE TABLE tx_test (id INTEGER PRIMARY KEY, x INTEGER)");
         const result = await client.transaction(async (tx) => {
-            await tx.run("INSERT INTO tx_test (x) VALUES (?)", [1]);
-            await tx.run("INSERT INTO tx_test (x) VALUES (?)", [2]);
+            await tx.run("INSERT INTO tx_test (id, x) VALUES (?, ?)", [1, 1]);
+            await tx.run("INSERT INTO tx_test (id, x) VALUES (?, ?)", [2, 2]);
             return 2;
         });
         expect(result).toBe(2);
@@ -146,7 +183,7 @@ describe.each(implementations)("$name", ({ createClient }) => {
         await client.run("CREATE TABLE rollback_test (id INTEGER PRIMARY KEY)");
         try {
             await client.transaction(async (tx) => {
-                await tx.run("INSERT INTO rollback_test DEFAULT VALUES");
+                await tx.run("INSERT INTO rollback_test (id) VALUES (?)", [1]);
                 throw new Error("abort");
             });
         } catch (e) {

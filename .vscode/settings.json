@@ -9,8 +9,10 @@
     "gamezilla",
     "healthcheck",
     "impls",
+    "pglite",
     "RAILPACK",
     "schemaname",
+    "sslmode",
     "tablename",
     "worklets"
   ]

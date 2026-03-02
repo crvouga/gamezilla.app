@@ -1,8 +1,8 @@
 import { SQL } from "bun";
 import type { RunResult, SqlClient } from "./interface";
+import { questionMarkParamsToDollarParams } from "./positional-params";
 
 type BunSql = InstanceType<typeof SQL>;
-
 
 export class SqlClientImplBunPostgres implements SqlClient {
     private client: SqlClient;
@@ -47,11 +47,13 @@ function createClient(sql: BunSql): SqlClient {
         connect: () => Promise.resolve(),
         disconnect: () => sql.close(),
         query: async <T = Record<string, unknown>>(querySql: string, params?: unknown[]) => {
-            const result = await sql.unsafe(querySql, params ?? []);
+            const [pgSql, pgParams] = questionMarkParamsToDollarParams(querySql, params);
+            const result = await sql.unsafe(pgSql, pgParams);
             return Array.isArray(result) ? (result as T[]) : [];
         },
         run: async (querySql: string, params?: unknown[]) => {
-            const result = await sql.unsafe(querySql, params ?? []);
+            const [pgSql, pgParams] = questionMarkParamsToDollarParams(querySql, params);
+            const result = await sql.unsafe(pgSql, pgParams);
             const rows = Array.isArray(result) ? result : [];
             const changes = getChanges(result, rows);
             const lastInsertRowid = getLastInsertRowid(result, rows);

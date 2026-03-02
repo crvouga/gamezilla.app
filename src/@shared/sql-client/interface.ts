@@ -1,6 +1,9 @@
 /**
  * Basic interface for a SQL database client.
  * Implementations should provide methods to connect, disconnect, and execute queries.
+ *
+ * All implementations use `?` for positional parameters. Pass params as an array
+ * in order: `query("SELECT * FROM t WHERE id = ?", [1])`.
  */
 
 export interface RunResult {

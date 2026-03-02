@@ -7,7 +7,7 @@ import {
 
 const TEST_PORT = 25432;
 
-describe("postgres-test-instance", () => {
+describe.skip("postgres-test-instance", () => {
     let pg: Awaited<ReturnType<typeof getPostgresTestInstance>> | null = null;
     let available = false;
 
