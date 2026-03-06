@@ -66,7 +66,7 @@ export function TodoListsOverview() {
             return;
         }
         const entityId = crypto.randomUUID();
-        await db.patch([
+        await db.write([
             {
                 entityId,
                 entityType: "todoList",

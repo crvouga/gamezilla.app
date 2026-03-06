@@ -17,24 +17,24 @@ export const SubscribablePatchesDbToken: InjectionToken<SubscribablePatchesDbLik
 export class SubscribablePatchesDb implements PatchesDb {
     constructor(private db: PatchesDb, private pubSub: PubSub) { }
 
-    async patch(patches: PatchInput[]): Promise<Patch[]> {
-        const result = await this.db.patch(patches);
+    async write(patches: PatchInput[]): Promise<Patch[]> {
+        const result = await this.db.write(patches);
         this.pubSub.publish(PATCHES_DB_TOPIC, { type: "invalidated" });
         return result;
     }
 
-    patches(queries: PatchesDbQuery[], knownPatches?: Patch[][]): Promise<PatchesDbResult<Patch>[]> {
-        return this.db.patches(queries, knownPatches);
+    readPatches(queries: PatchesDbQuery[], knownPatches?: Patch[][]): Promise<PatchesDbResult<Patch>[]> {
+        return this.db.readPatches(queries, knownPatches);
     }
 
-    entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
-        return this.db.entities(query);
+    readEntities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
+        return this.db.readEntities(query);
     }
 
     subscribe = {
         patches: (query: PatchesDbQuery, listener: (result: PatchesDbResult<Patch>) => void): Unsubscribe => {
             const notify = async () => {
-                const [result] = await this.db.patches([query]);
+                const [result] = await this.db.readPatches([query]);
                 listener(result);
             };
             void notify();
@@ -42,7 +42,7 @@ export class SubscribablePatchesDb implements PatchesDb {
         },
         entities: (query: PatchesDbQuery, listener: (result: PatchesDbResult<Entity>) => void): Unsubscribe => {
             const notify = async () => {
-                const result = await this.db.entities(query);
+                const result = await this.db.readEntities(query);
                 listener(result);
             };
             void notify();

@@ -10,22 +10,22 @@ export function createPatchDbHttpHandlers(db: PatchesDb): (req: Request) => Prom
             const { queries, knownPatches } = body;
             if (knownPatches?.length) {
                 for (const patches of knownPatches) {
-                    if (patches.length > 0) await db.patch(patches);
+                    if (patches.length > 0) await db.write(patches);
                 }
             }
-            const results = await db.patches(queries);
+            const results = await db.readPatches(queries);
             return Response.json(results);
         }
 
         if (url.pathname === ENTITIES_QUERY && req.method === "POST") {
             const body = (await req.json()) as { query: PatchesDbQuery };
-            const result = await db.entities(body.query);
+            const result = await db.readEntities(body.query);
             return Response.json(result);
         }
 
         if (url.pathname === PATCHES_WRITE && req.method === "POST") {
-            const body = (await req.json()) as { patches: Parameters<PatchesDb["patch"]>[0] };
-            const patches = await db.patch(body.patches);
+            const body = (await req.json()) as { patches: Parameters<PatchesDb["write"]>[0] };
+            const patches = await db.write(body.patches);
             return Response.json(patches);
         }
 

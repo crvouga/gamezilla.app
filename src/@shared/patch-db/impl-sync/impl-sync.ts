@@ -21,11 +21,9 @@ type ActiveQuery = {
     refCount: number;
 };
 
-function getLastRecordedAt(patches: Patch[]): string | null {
+function getCursorPatchId(patches: Patch[]): string | null {
     if (patches.length === 0) return null;
-    return patches.reduce((max, p) =>
-        p.recordedAt > max ? p.recordedAt : max
-        , patches[0].recordedAt);
+    return patches[patches.length - 1].patchId;
 }
 
 export class SyncPatchesDb implements PatchesDb {
@@ -53,22 +51,22 @@ export class SyncPatchesDb implements PatchesDb {
         this.ensurePushTimer();
     }
 
-    async patch(patches: PatchInput[]): Promise<Patch[]> {
+    async write(patches: PatchInput[]): Promise<Patch[]> {
         const withUnsynced = patches.map((p) => ({
             ...p,
             meta: { ...p.meta, syncedAt: null },
         }));
-        const result = await this.local.patch(withUnsynced);
+        const result = await this.local.write(withUnsynced);
         this.pubSub.publish(PATCHES_DB_TOPIC, { type: "invalidated" });
         return result;
     }
 
-    patches(queries: PatchesDbQuery[], knownPatches?: Patch[][]): Promise<PatchesDbResult<Patch>[]> {
-        return this.local.patches(queries, knownPatches);
+    readPatches(queries: PatchesDbQuery[], knownPatches?: Patch[][]): Promise<PatchesDbResult<Patch>[]> {
+        return this.local.readPatches(queries, knownPatches);
     }
 
-    entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
-        return this.local.entities(query);
+    readEntities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
+        return this.local.readEntities(query);
     }
 
     private queryKey(query: PatchesDbQuery): string {
@@ -90,10 +88,10 @@ export class SyncPatchesDb implements PatchesDb {
         }
 
         const notify = async () => {
-                const result =
-                    mode === "patches"
-                        ? ((await this.local.patches([query]))[0] as PatchesDbResult<T>)
-                    : ((await this.local.entities(query)) as PatchesDbResult<T>);
+            const result =
+                mode === "patches"
+                    ? ((await this.local.readPatches([query]))[0] as PatchesDbResult<T>)
+                    : ((await this.local.readEntities(query)) as PatchesDbResult<T>);
             listener(result);
         };
         void notify();
@@ -142,7 +140,7 @@ export class SyncPatchesDb implements PatchesDb {
         try {
             const patches = await this.local.getUnsyncedPatches();
             if (patches.length === 0) return;
-            await this.remote.patch(patches);
+            await this.remote.write(patches);
             await this.local.markPatchesSynced(patches.map((p) => p.patchId));
             this.pubSub.publish(PATCHES_DB_TOPIC, { type: "invalidated" });
         } catch (err) {
@@ -158,16 +156,16 @@ export class SyncPatchesDb implements PatchesDb {
             const syncQueries: PatchesDbQuery[] = [];
             const knownPatches: Patch[][] = [];
             for (const { query } of entries) {
-                const [localResult] = await this.local.patches([query]);
-                const lastRecordedAt = getLastRecordedAt(localResult.data);
+                const [localResult] = await this.local.readPatches([query]);
+                const cursorPatchId = getCursorPatchId(localResult.data);
                 syncQueries.push({
                     ...query,
-                    after: lastRecordedAt ?? undefined,
+                    after: cursorPatchId ?? undefined,
                 });
                 knownPatches.push(localResult.data);
             }
 
-            const results = await this.remote.patches(syncQueries, knownPatches);
+            const results = await this.remote.readPatches(syncQueries, knownPatches);
 
             let hasNewPatches = false;
             for (const remoteResult of results) {
@@ -176,7 +174,7 @@ export class SyncPatchesDb implements PatchesDb {
                         ...p,
                         meta: { ...p.meta, syncedAt: new Date().toISOString() },
                     }));
-                    await this.local.patch(withSynced);
+                    await this.local.write(withSynced);
                     hasNewPatches = true;
                 }
             }

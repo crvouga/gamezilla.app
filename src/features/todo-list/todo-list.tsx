@@ -99,7 +99,7 @@ export function TodoList() {
         const title = input.trim();
         if (!title) return;
         const entityId = crypto.randomUUID();
-        await db.patch([
+        await db.write([
             {
                 entityId,
                 entityType: "todo",
@@ -116,7 +116,7 @@ export function TodoList() {
 
     const toggleTodo = async (entity: TodoEntity) => {
         const completed = entity.attributes.completed === true;
-        await db.patch([
+        await db.write([
             {
                 entityId: entity.entityId,
                 entityType: "todo",
@@ -126,7 +126,7 @@ export function TodoList() {
     };
 
     const deleteTodo = async (entity: TodoEntity) => {
-        await db.patch([
+        await db.write([
             {
                 entityId: entity.entityId,
                 entityType: "todo",

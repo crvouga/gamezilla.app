@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { DependencyInjectionContainer } from "../dependency-injection/dependency-injection-container";
 import { InMemoryPubSub } from "../pub-sub/impl-in-memory";
 import { SqlClientImplExpoSqlite } from "../sql-client/impl-expo-sqlite";
@@ -19,6 +20,10 @@ export type BootstrapPatchDbExpoSyncOptions = {
     parentContainer?: DependencyInjectionContainer;
 };
 
+/** On web, expo-sqlite uses File System API which allows only one access handle per file.
+ * Caching the bootstrap promise prevents NoModificationAllowedError from Strict Mode double-mount or hot reload. */
+let cachedBootstrap: { key: string; promise: Promise<BootstrapResult> } | null = null;
+
 export async function bootstrapPatchDbExpoSync(
     options: BootstrapPatchDbExpoSyncOptions
 ): Promise<BootstrapResult> {
@@ -30,19 +35,31 @@ export async function bootstrapPatchDbExpoSync(
         parentContainer,
     } = options;
 
-    const sqlClient = await SqlClientImplExpoSqlite.open(databaseName);
-    await sqlClient.connect();
+    const key = `${databaseName}:${apiUrl}`;
+    if (Platform.OS === "web" && cachedBootstrap?.key === key) {
+        return cachedBootstrap.promise;
+    }
 
-    const localDb = new PatchDbImplSqlite(sqlClient);
-    await localDb.migrate();
+    const bootstrapPromise = (async (): Promise<BootstrapResult> => {
+        const sqlClient = await SqlClientImplExpoSqlite.open(databaseName);
+        await sqlClient.connect();
 
-    const remoteDb = new PatchDbImplHttp(apiUrl);
-    const pubSub = new InMemoryPubSub();
-    const syncDb = new SyncPatchesDb(localDb, remoteDb, pubSub, { pollIntervalMs, pushIntervalMs });
+        const localDb = new PatchDbImplSqlite(sqlClient);
+        await localDb.migrate();
 
-    const container = new DependencyInjectionContainer(parentContainer);
-    container.registerValue(PatchesDbToken, syncDb);
-    container.registerValue(SubscribablePatchesDbToken, syncDb);
+        const remoteDb = new PatchDbImplHttp(apiUrl);
+        const pubSub = new InMemoryPubSub();
+        const syncDb = new SyncPatchesDb(localDb, remoteDb, pubSub, { pollIntervalMs, pushIntervalMs });
 
-    return { container };
+        const container = new DependencyInjectionContainer(parentContainer);
+        container.registerValue(PatchesDbToken, syncDb);
+        container.registerValue(SubscribablePatchesDbToken, syncDb);
+
+        return { container };
+    })();
+
+    if (Platform.OS === "web") {
+        cachedBootstrap = { key, promise: bootstrapPromise };
+    }
+    return bootstrapPromise;
 }

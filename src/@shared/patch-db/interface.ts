@@ -97,9 +97,9 @@ export type PatchesDbResult<T> = {
 }
 
 export interface PatchesDb {
-    patch(patches: PatchInput[]): Promise<Patch[]>;
-    patches(queries: PatchesDbQuery[], knownPatches?: Patch[][]): Promise<PatchesDbResult<Patch>[]>;
-    entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>>;
+    write(patches: PatchInput[]): Promise<Patch[]>;
+    readPatches(queries: PatchesDbQuery[], knownPatches?: Patch[][]): Promise<PatchesDbResult<Patch>[]>;
+    readEntities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>>;
 }
 
 export interface SyncStatePatchesDb extends PatchesDb {
