@@ -39,7 +39,7 @@ const server = Bun.serve({
             return withCors(new Response("ok", { status: 200, headers: { "Content-Type": "text/plain" } }));
         }
 
-        if (url.pathname.startsWith("/api/")) {
+        if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/patches-db/")) {
             return patchDbHandler(req).then(withCors);
         }
 

@@ -13,19 +13,21 @@ export type BootstrapResult = {
 
 export type BootstrapPatchDbExpoSyncOptions = {
     databaseName?: string;
-    apiUrl?: string;
+    apiUrl: string;
     pollIntervalMs?: number;
     pushIntervalMs?: number;
+    parentContainer?: DependencyInjectionContainer;
 };
 
 export async function bootstrapPatchDbExpoSync(
-    options: BootstrapPatchDbExpoSyncOptions = {}
+    options: BootstrapPatchDbExpoSyncOptions
 ): Promise<BootstrapResult> {
     const {
         databaseName = "main",
-        apiUrl = "http://localhost:5001",
+        apiUrl,
         pollIntervalMs = 1000,
         pushIntervalMs = 2000,
+        parentContainer,
     } = options;
 
     const sqlClient = await SqlClientImplExpoSqlite.open(databaseName);
@@ -38,7 +40,7 @@ export async function bootstrapPatchDbExpoSync(
     const pubSub = new InMemoryPubSub();
     const syncDb = new SyncPatchesDb(localDb, remoteDb, pubSub, { pollIntervalMs, pushIntervalMs });
 
-    const container = new DependencyInjectionContainer();
+    const container = new DependencyInjectionContainer(parentContainer);
     container.registerValue(PatchesDbToken, syncDb);
     container.registerValue(SubscribablePatchesDbToken, syncDb);
 

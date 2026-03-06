@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import { ConfigContainerProvider } from '@/@shared/config/config-container';
 import { ThemeProvider as AppThemeProvider } from '@/@shared/theme';
 import { PatchBootstrap } from '@/components/patch-bootstrap';
 import { useColorScheme } from '../hooks/use-color-scheme';
@@ -18,6 +19,7 @@ export default function RootLayout() {
   return (
     <AppThemeProvider colorScheme={scheme}>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ConfigContainerProvider>
       <PatchBootstrap>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -25,6 +27,7 @@ export default function RootLayout() {
         </Stack>
         <StatusBar style="auto" />
       </PatchBootstrap>
+      </ConfigContainerProvider>
     </ThemeProvider>
     </AppThemeProvider>
   );

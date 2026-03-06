@@ -144,7 +144,7 @@ export function TodoListsOverview() {
                 data={data}
                 keyExtractor={(item) => item.id}
                 style={theme.sx({ flex: 1 })}
-                contentContainerStyle={theme.sx({ paddingBottom: 24 })}
+                contentContainerStyle={theme.sx({ pb: 24 })}
                 renderItem={({ item }) => (
                     <Pressable
                         onPress={() => openList(item.id)}

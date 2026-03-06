@@ -1,0 +1,8 @@
+{
+    "local": {
+        "PATCH_DB_RELAY_URL": "http://localhost:5001"
+    },
+    "prod": {
+        "PATCH_DB_RELAY_URL": "https://gamezillaapp-production.up.railway.app"
+    }
+}
