@@ -291,11 +291,10 @@ export class PatchDbImplSqlite implements SyncStatePatchesDb {
 
     async markPatchesSynced(patchIds: string[]): Promise<void> {
         if (patchIds.length === 0) return;
-        const now = new Date().toISOString();
         const placeholders = patchIds.map(() => "?").join(", ");
         await this.sqlClient.run(
             `UPDATE patches SET metadata = json_set(metadata, '$.syncedAt', ?) WHERE patch_id IN (${placeholders})`,
-            [now, ...patchIds]
+            ["1", ...patchIds]
         );
     }
 }

@@ -26,6 +26,12 @@ function getCursorPatchId(patches: Patch[]): string | null {
     return patches[patches.length - 1].patchId;
 }
 
+/** Strip limit/offset so we get the true last patch in lineage order for cursor. */
+function queryForCursor(query: PatchesDbQuery): PatchesDbQuery {
+    const { limit, offset, ...rest } = query;
+    return rest;
+}
+
 export class SyncPatchesDb implements PatchesDb {
     subscribe = {
         patches: (
@@ -156,7 +162,7 @@ export class SyncPatchesDb implements PatchesDb {
             const syncQueries: PatchesDbQuery[] = [];
             const knownPatches: Patch[][] = [];
             for (const { query } of entries) {
-                const [localResult] = await this.local.readPatches([query]);
+                const [localResult] = await this.local.readPatches([queryForCursor(query)]);
                 const cursorPatchId = getCursorPatchId(localResult.data);
                 syncQueries.push({
                     ...query,
@@ -172,7 +178,7 @@ export class SyncPatchesDb implements PatchesDb {
                 if (remoteResult.data.length > 0) {
                     const withSynced = remoteResult.data.map((p) => ({
                         ...p,
-                        meta: { ...p.meta, syncedAt: new Date().toISOString() },
+                        meta: { ...p.meta, syncedAt: "1" },
                     }));
                     await this.local.write(withSynced);
                     hasNewPatches = true;
