@@ -63,8 +63,8 @@ export class SyncPatchesDb implements PatchesDb {
         return result;
     }
 
-    patches(queries: PatchesDbQuery[]): Promise<PatchesDbResult<Patch>[]> {
-        return this.local.patches(queries);
+    patches(queries: PatchesDbQuery[], knownPatches?: Patch[][]): Promise<PatchesDbResult<Patch>[]> {
+        return this.local.patches(queries, knownPatches);
     }
 
     entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
@@ -156,6 +156,7 @@ export class SyncPatchesDb implements PatchesDb {
 
         try {
             const syncQueries: PatchesDbQuery[] = [];
+            const knownPatches: Patch[][] = [];
             for (const { query } of entries) {
                 const [localResult] = await this.local.patches([query]);
                 const lastRecordedAt = getLastRecordedAt(localResult.data);
@@ -163,9 +164,10 @@ export class SyncPatchesDb implements PatchesDb {
                     ...query,
                     after: lastRecordedAt ?? undefined,
                 });
+                knownPatches.push(localResult.data);
             }
 
-            const results = await this.remote.patches(syncQueries);
+            const results = await this.remote.patches(syncQueries, knownPatches);
 
             let hasNewPatches = false;
             for (const remoteResult of results) {

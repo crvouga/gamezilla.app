@@ -152,7 +152,7 @@ export class PatchDbImplPostgres implements SyncStatePatchesDb {
         return result;
     }
 
-    async patches(queries: PatchesDbQuery[]): Promise<PatchesDbResult<Patch>[]> {
+    async patches(queries: PatchesDbQuery[], _knownPatches?: Patch[][]): Promise<PatchesDbResult<Patch>[]> {
         if (queries.length === 0) return [];
         return Promise.all(queries.map((q) => this.patchesOne(q)));
     }

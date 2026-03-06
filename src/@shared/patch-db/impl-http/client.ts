@@ -25,9 +25,11 @@ export class PatchDbImplHttp implements PatchesDb {
         return res.json() as Promise<T>;
     }
 
-    async patches(queries: PatchesDbQuery[]): Promise<PatchesDbResult<Patch>[]> {
+    async patches(queries: PatchesDbQuery[], knownPatches?: Patch[][]): Promise<PatchesDbResult<Patch>[]> {
         if (queries.length === 0) return [];
-        return this.post<PatchesDbResult<Patch>[]>(PATCHES_QUERY, { queries });
+        const body: { queries: PatchesDbQuery[]; knownPatches?: Patch[][] } = { queries };
+        if (knownPatches != null) body.knownPatches = knownPatches;
+        return this.post<PatchesDbResult<Patch>[]>(PATCHES_QUERY, body);
     }
 
     async entities(query: PatchesDbQuery): Promise<PatchesDbResult<Entity>> {
